@@ -6,7 +6,7 @@ use warnings;
 
 use Cwd qw(abs_path);
 
-use lib abs_path('Net-OpenSSH-0.52/lib');
+use lib abs_path("./Net-OpenSSH-0.52/lib");
 
 
 require Exporter;
