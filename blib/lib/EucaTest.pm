@@ -4,11 +4,7 @@ use 5.000003;
 use strict;
 use warnings;
 
-#use FindBin;
-#use lib "$FindBin::Bin/./Net-OpenSSH-0.52/lib";
-
-
-require 'Net-OpenSSH-0.52/lib/Net/OpenSSH.pm';
+use Net::OpenSSH;
 require Exporter;
 
 

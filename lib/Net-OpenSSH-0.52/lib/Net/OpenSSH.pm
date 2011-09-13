@@ -7,6 +7,9 @@ use warnings;
 
 our $debug ||= 0;
 
+
+use Cwd qw(abs_path);
+
 use Carp qw(carp croak);
 use POSIX qw(:sys_wait_h);
 use Socket;
@@ -14,7 +17,14 @@ use File::Spec;
 use Cwd ();
 use Scalar::Util ();
 use Errno ();
-require 'OpenSSH/Constants.pm';
+
+#use FindBin;                 # locate this script
+#use lib abs_path("OpenSSH"); ;
+
+#use Constants qw(:error);
+
+#require 'OpenSSH/Constants.pm';
+
 
 sub _debug { print STDERR '# ', (map { defined($_) ? $_ : '<undef>' } @_), "\n" }
 
