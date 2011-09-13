@@ -1,0 +1,124 @@
+sub new{
+	my $class = shift;
+	my $opts = shift;
+sub fail {
+sub pass {
+sub test_name {
+sub get_verifylevel{
+sub set_verifylevel{
+	my $level = shift;
+sub get_toolkit{
+sub set_toolkit{
+	my $toolkit = shift;
+sub get_ssh{
+sub set_ssh{
+	my $ssh = shift;
+sub get_timeout{
+sub set_timeout{
+	my $timeout = shift;
+sub get_credpath{
+sub set_credpath{
+	my $credpath = shift;
+sub sys {
+  my $cmd = shift;
+  my $timeout = shift;
+  	$SIG{ALRM} = sub { die "alarm\n"; };
+sub get_cred {
+sub download_cred{
+sub add_keypair{
+	my $keyname = shift;
+sub delete_keypair{
+	my $keyname = shift;
+sub found {
+sub add_group{
+	my $groupname = shift;
+	my $ip = shift;
+sub delete_group{
+	my $groupname = shift;
+	my $ip = shift;
+sub allocate_address{
+sub release_address{
+	my $address = shift;
+sub get_emi{
+	my $filter = shift;
+sub download_euca_image{
+	my $source = shift;
+	my $dest = shift;
+sub upload_euca_image{
+	my $dir = shift;
+	my $hypervisor = shift;
+	my $prefix = shift;
+sub run_instance{
+	my $keypair = shift;
+	my $group = shift;
+sub terminate_instance{
+	my $instance_id = shift;	
+sub get_instance_info{
+	my $instance_id = shift;
+sub teardown_instance{
+	my $instance_id = shift;
+	my $ip = shift;
+sub create_volume{
+	my $zone = shift;
+	my $opts = shift;
+sub delete_volume{
+	my $volume = shift;
+sub attach_volume{
+	my $volume = shift;
+	my $instance = shift;
+	my $device = shift;
+sub detach_volume{
+	my $volume = shift;
+sub euare_create_account{
+	my $new_account = shift;
+sub euare_delete_account{
+	my $deleted_account = shift;
+sub euare_create_user{
+	my $new_user = shift;
+	my $account = shift;
+	my $user_path = shift;
+sub euare_change_username{
+	my $old_user_name = shift;
+	my $new_user_name = shift;
+	my $account = shift;
+	my $path = shift;
+sub euare_clean_accounts {
+sub euare_add_userinfo{ 
+	my $user = shift;
+	my $key = shift;
+	my $value = shift;
+sub euare_create_loginprofile{
+	my $user = shift;
+	my $password = shift;
+sub euare_delete_loginprofile{
+	my $user = shift;
+sub euare_add_userkey{
+	my $user = shift;
+sub euare_deactivate_key{
+	my $user = shift;
+	my $key = shift;
+sub euare_delete_key{
+	my $user = shift;
+	my $key = shift;
+sub euare_create_cert{
+	my $user = shift;
+sub euare_deactviate_cert{
+	my $user = shift;
+	my $cert = shift;
+sub euare_delete_cert{
+	my $user = shift;
+	my $cert = shift;
+sub euare_add_certfromfile{
+	my $user = shift;
+	my $filename = shift;
+sub get_currentaccount{
+sub euare_create_group{
+	my $group = shift;
+	my $path = shift;
+sub euare_parse_arn{
+	my $type = shift;
+	my $name = shift;
+sub euare_modattr{
+	my $type = shift;
+	my $name = shift;
+	my $opts = shift;
