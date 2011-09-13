@@ -159,7 +159,9 @@ C_FILES  =
 O_FILES  = 
 H_FILES  = 
 MAN1PODS = 
-MAN3PODS = lib/EucaTest.pm
+MAN3PODS = lib/EucaTest.pm \
+	lib/Net-OpenSSH-0.52/lib/Net/OpenSSH.pm \
+	lib/Net-OpenSSH-0.52/lib/Net/OpenSSH/Constants.pm
 
 # Where is the Config information that we are using/depend on
 CONFIGDEP = $(PERL_ARCHLIB)$(DFSEP)Config.pm $(PERL_INC)$(DFSEP)config.h
@@ -181,10 +183,70 @@ PERL_ARCHIVE       =
 PERL_ARCHIVE_AFTER = 
 
 
-TO_INST_PM = lib/EucaTest.pm
+TO_INST_PM = lib/EucaTest.pm \
+	lib/Net-OpenSSH-0.52.tar.gz \
+	lib/Net-OpenSSH-0.52/Changes \
+	lib/Net-OpenSSH-0.52/MANIFEST \
+	lib/Net-OpenSSH-0.52/META.yml \
+	lib/Net-OpenSSH-0.52/Makefile.PL \
+	lib/Net-OpenSSH-0.52/README \
+	lib/Net-OpenSSH-0.52/lib/Net/OpenSSH.pm \
+	lib/Net-OpenSSH-0.52/lib/Net/OpenSSH/Constants.pm \
+	lib/Net-OpenSSH-0.52/sample/autosudo.pl \
+	lib/Net-OpenSSH-0.52/sample/change_passwd.pl \
+	lib/Net-OpenSSH-0.52/sample/expect.pl \
+	lib/Net-OpenSSH-0.52/sample/net-telnet.pl \
+	lib/Net-OpenSSH-0.52/t/1_run.t \
+	lib/Net-OpenSSH-0.52/t/2_pods.t \
+	lib/Net-OpenSSH-0.52/t/common.pm \
+	lib/Net-OpenSSH-0.52/t/known_hosts \
+	lib/Net-OpenSSH-0.52/t/test_server_key \
+	lib/Net-OpenSSH-0.52/t/test_server_key.pub \
+	lib/Net-OpenSSH-0.52/t/test_user_key \
+	lib/Net-OpenSSH-0.52/t/test_user_key.pub
 
-PM_TO_BLIB = lib/EucaTest.pm \
-	blib/lib/EucaTest.pm
+PM_TO_BLIB = lib/Net-OpenSSH-0.52/t/2_pods.t \
+	blib/lib/Net-OpenSSH-0.52/t/2_pods.t \
+	lib/Net-OpenSSH-0.52/lib/Net/OpenSSH/Constants.pm \
+	blib/lib/Net-OpenSSH-0.52/lib/Net/OpenSSH/Constants.pm \
+	lib/Net-OpenSSH-0.52/t/test_server_key.pub \
+	blib/lib/Net-OpenSSH-0.52/t/test_server_key.pub \
+	lib/Net-OpenSSH-0.52/t/test_user_key \
+	blib/lib/Net-OpenSSH-0.52/t/test_user_key \
+	lib/EucaTest.pm \
+	blib/lib/EucaTest.pm \
+	lib/Net-OpenSSH-0.52/t/1_run.t \
+	blib/lib/Net-OpenSSH-0.52/t/1_run.t \
+	lib/Net-OpenSSH-0.52/META.yml \
+	blib/lib/Net-OpenSSH-0.52/META.yml \
+	lib/Net-OpenSSH-0.52/lib/Net/OpenSSH.pm \
+	blib/lib/Net-OpenSSH-0.52/lib/Net/OpenSSH.pm \
+	lib/Net-OpenSSH-0.52.tar.gz \
+	blib/lib/Net-OpenSSH-0.52.tar.gz \
+	lib/Net-OpenSSH-0.52/t/common.pm \
+	blib/lib/Net-OpenSSH-0.52/t/common.pm \
+	lib/Net-OpenSSH-0.52/t/test_server_key \
+	blib/lib/Net-OpenSSH-0.52/t/test_server_key \
+	lib/Net-OpenSSH-0.52/sample/change_passwd.pl \
+	blib/lib/Net-OpenSSH-0.52/sample/change_passwd.pl \
+	lib/Net-OpenSSH-0.52/Makefile.PL \
+	blib/lib/Net-OpenSSH-0.52/Makefile.PL \
+	lib/Net-OpenSSH-0.52/README \
+	blib/lib/Net-OpenSSH-0.52/README \
+	lib/Net-OpenSSH-0.52/sample/autosudo.pl \
+	blib/lib/Net-OpenSSH-0.52/sample/autosudo.pl \
+	lib/Net-OpenSSH-0.52/sample/net-telnet.pl \
+	blib/lib/Net-OpenSSH-0.52/sample/net-telnet.pl \
+	lib/Net-OpenSSH-0.52/t/test_user_key.pub \
+	blib/lib/Net-OpenSSH-0.52/t/test_user_key.pub \
+	lib/Net-OpenSSH-0.52/MANIFEST \
+	blib/lib/Net-OpenSSH-0.52/MANIFEST \
+	lib/Net-OpenSSH-0.52/Changes \
+	blib/lib/Net-OpenSSH-0.52/Changes \
+	lib/Net-OpenSSH-0.52/sample/expect.pl \
+	blib/lib/Net-OpenSSH-0.52/sample/expect.pl \
+	lib/Net-OpenSSH-0.52/t/known_hosts \
+	blib/lib/Net-OpenSSH-0.52/t/known_hosts
 
 
 # --- MakeMaker platform_constants section:
@@ -406,9 +468,13 @@ POD2MAN = $(POD2MAN_EXE)
 
 
 manifypods : pure_all  \
-	lib/EucaTest.pm
+	lib/EucaTest.pm \
+	lib/Net-OpenSSH-0.52/lib/Net/OpenSSH/Constants.pm \
+	lib/Net-OpenSSH-0.52/lib/Net/OpenSSH.pm
 	$(NOECHO) $(POD2MAN) --section=3 --perm_rw=$(PERM_RW) \
-	  lib/EucaTest.pm $(INST_MAN3DIR)/EucaTest.$(MAN3EXT) 
+	  lib/EucaTest.pm $(INST_MAN3DIR)/EucaTest.$(MAN3EXT) \
+	  lib/Net-OpenSSH-0.52/lib/Net/OpenSSH/Constants.pm $(INST_MAN3DIR)/Net-OpenSSH-0.52::lib::Net::OpenSSH::Constants.$(MAN3EXT) \
+	  lib/Net-OpenSSH-0.52/lib/Net/OpenSSH.pm $(INST_MAN3DIR)/Net-OpenSSH-0.52::lib::Net::OpenSSH.$(MAN3EXT) 
 
 
 
@@ -797,7 +863,27 @@ ppd :
 
 pm_to_blib : $(FIRST_MAKEFILE) $(TO_INST_PM)
 	$(NOECHO) $(ABSPERLRUN) -MExtUtils::Install -e 'pm_to_blib({@ARGV}, '\''$(INST_LIB)/auto'\'', q[$(PM_FILTER)], '\''$(PERM_DIR)'\'')' -- \
-	  lib/EucaTest.pm blib/lib/EucaTest.pm 
+	  lib/Net-OpenSSH-0.52/t/2_pods.t blib/lib/Net-OpenSSH-0.52/t/2_pods.t \
+	  lib/Net-OpenSSH-0.52/lib/Net/OpenSSH/Constants.pm blib/lib/Net-OpenSSH-0.52/lib/Net/OpenSSH/Constants.pm \
+	  lib/Net-OpenSSH-0.52/t/test_server_key.pub blib/lib/Net-OpenSSH-0.52/t/test_server_key.pub \
+	  lib/Net-OpenSSH-0.52/t/test_user_key blib/lib/Net-OpenSSH-0.52/t/test_user_key \
+	  lib/EucaTest.pm blib/lib/EucaTest.pm \
+	  lib/Net-OpenSSH-0.52/t/1_run.t blib/lib/Net-OpenSSH-0.52/t/1_run.t \
+	  lib/Net-OpenSSH-0.52/META.yml blib/lib/Net-OpenSSH-0.52/META.yml \
+	  lib/Net-OpenSSH-0.52/lib/Net/OpenSSH.pm blib/lib/Net-OpenSSH-0.52/lib/Net/OpenSSH.pm \
+	  lib/Net-OpenSSH-0.52.tar.gz blib/lib/Net-OpenSSH-0.52.tar.gz \
+	  lib/Net-OpenSSH-0.52/t/common.pm blib/lib/Net-OpenSSH-0.52/t/common.pm \
+	  lib/Net-OpenSSH-0.52/t/test_server_key blib/lib/Net-OpenSSH-0.52/t/test_server_key \
+	  lib/Net-OpenSSH-0.52/sample/change_passwd.pl blib/lib/Net-OpenSSH-0.52/sample/change_passwd.pl \
+	  lib/Net-OpenSSH-0.52/Makefile.PL blib/lib/Net-OpenSSH-0.52/Makefile.PL \
+	  lib/Net-OpenSSH-0.52/README blib/lib/Net-OpenSSH-0.52/README \
+	  lib/Net-OpenSSH-0.52/sample/autosudo.pl blib/lib/Net-OpenSSH-0.52/sample/autosudo.pl \
+	  lib/Net-OpenSSH-0.52/sample/net-telnet.pl blib/lib/Net-OpenSSH-0.52/sample/net-telnet.pl \
+	  lib/Net-OpenSSH-0.52/t/test_user_key.pub blib/lib/Net-OpenSSH-0.52/t/test_user_key.pub \
+	  lib/Net-OpenSSH-0.52/MANIFEST blib/lib/Net-OpenSSH-0.52/MANIFEST \
+	  lib/Net-OpenSSH-0.52/Changes blib/lib/Net-OpenSSH-0.52/Changes \
+	  lib/Net-OpenSSH-0.52/sample/expect.pl blib/lib/Net-OpenSSH-0.52/sample/expect.pl \
+	  lib/Net-OpenSSH-0.52/t/known_hosts blib/lib/Net-OpenSSH-0.52/t/known_hosts 
 	$(NOECHO) $(TOUCH) pm_to_blib
 
 

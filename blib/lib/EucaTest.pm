@@ -1,11 +1,16 @@
 package EucaTest;
 
-use 5.012003;
+use 5.000003;
 use strict;
 use warnings;
 
+#use FindBin;
+#use lib "$FindBin::Bin/./Net-OpenSSH-0.52/lib";
+
+
+require 'Net-OpenSSH-0.52/lib/Net/OpenSSH.pm';
 require Exporter;
-require Net::OpenSSH;
+
 
 
 our @ISA = qw(Exporter);
@@ -45,7 +50,7 @@ sub new{
 			$ssh->error and
    			fail( $ssh->error);
 		}else{
-			$ssh =  Net::OpenSSH->new($host);
+			$ssh =  Net::OpenSSH->new($host,  master_opts => [-o => "StrictHostKeyChecking=no" ] );
 			$ssh->error and
    			fail( $ssh->error);
 		}
@@ -209,6 +214,56 @@ sub sys {
 	}
 	
 }
+
+sub read_input_file{
+	my $self = shift;
+	my $filename = shift;
+	my $is_memo = 0;
+	my $memo = "";
+	my %CLC;
+	open( INPUT, "< $filename" ) || die $!;
+
+	my $line;
+	while( $line = <INPUT> ){
+		chomp($line);
+		if( $is_memo ){
+			if( $line ne "END_MEMO" ){
+				$memo .= $line . "\n";
+			};
+		};
+
+        	if( $line =~ /^([\d\.]+)\t(.+)\t(.+)\t(\d+)\t(.+)\t\[(.+)\]/ ){
+			my $qa_ip = $1;
+			my $qa_distro = $2;
+			my $qa_distro_ver = $3;
+			my $qa_arch = $4;
+			my $qa_source = $5;
+			my $qa_roll = $6;
+
+			my $this_roll = lc($6);
+			if( $this_roll =~ /clc/ ){
+				print "\n";
+				print "IP $qa_ip [Distro $qa_distro, Version $qa_distro_ver, ARCH $qa_arch] is built from $qa_source as Eucalyptus-$qa_roll\n";
+				$CLC{'QA_DISTRO'} = $qa_distro;
+				$CLC{'QA_DISTRO_VER'} = $qa_distro_ver;
+				$CLC{'QA_ARCH'} = $qa_arch;
+				$CLC{'QA_SOURCE'} = $qa_source;
+				$CLC{'QA_ROLL'} = $qa_roll;
+				$CLC{'QA_IP'} = $qa_ip;
+			};
+		}elsif( $line =~ /^MEMO/ ){
+			$is_memo = 1;
+		}elsif( $line =~ /^END_MEMO/ ){
+			$is_memo = 0;
+		};
+	};	
+
+	close(INPUT);
+
+	$CLC{'QA_MEMO'} = $memo;
+
+	return %CLC;
+};
 
 sub get_cred {
   my($self, $account, $user) = @_;
@@ -488,10 +543,11 @@ sub upload_euca_image{
 	
 	my @eki = split(/\s/, $eki_result[0]);
 	my @eri = split(/\s/, $eri_result[0]);
+	my @img = split(/\//, $dir);
 	
-	$self->sys("$self->{TOOLKIT}bundle-image -i $dir/$image[0] --ramdisk $eri[1] --kernel $eki[1]");
-	$self->sys("$self->{TOOLKIT}upload-bundle -b $prefix-image-bucket -m /tmp/$image[0].manifest.xml");
-	my @emi_result = $self->sys("$self->{TOOLKIT}register $prefix-image-bucket/$image[0].manifest.xml");
+	$self->sys("$self->{TOOLKIT}bundle-image -i $dir/$img[2].img --ramdisk $eri[1] --kernel $eki[1]");
+	$self->sys("$self->{TOOLKIT}upload-bundle -b $prefix-image-bucket -m /tmp/$img[2].img.manifest.xml");
+	my @emi_result = $self->sys("$self->{TOOLKIT}register $prefix-image-bucket/$img[2].img.manifest.xml");
 	my @emi = split(/\s/, $emi_result[0]);
 	$self->set_timeout(120);
 	if($emi_result[0] !~ /emi/){
@@ -520,19 +576,23 @@ sub run_instance{
 		test_name("Sleeping 20 seconds then checking instance state");
 		sleep 20;
 		my ($emi, $ip, $state) = $self->get_instance_info($instance_id);
-		
+		if ( $emi == -1){
+			fail ("Could not find the instance in the describe instances pool after issuing run and waiting 20s");
+			return -1;
+		}
 		pass("Instance $instance_id started with emi $emi at $instance[9] with IP= $ip");
 		
-		
-		while ( $state eq "pending"){
+		my $count = 0;
+		while ( ($state eq "pending") && ($count < 15) ){
 			test_name("Polling every 20s until instance in running state");
 			sleep 20;
 			
 			($emi, $ip, $state) = $self->get_instance_info($instance_id);
-			if($emi == -1){
+			if( $emi !~ /emi/){
 				fail("Could not find the instance in the describe instances pool");
 				return -1;
 			}
+			$count++;
 		}
 		
 		if( $state ne "running"){
@@ -1073,7 +1133,7 @@ None by default.
 Original version; created by h2xs 1.23 with options
 
   -ACXn
-	EucaTest
+	EucaTest is now working under the Eucalyptus QA system. 
 
 =back
 
@@ -1081,14 +1141,7 @@ Original version; created by h2xs 1.23 with options
 
 =head1 SEE ALSO
 
-Mention other useful documentation such as the documentation of
-related modules or operating system documentation (such as man pages
-in UNIX), or any relevant external documentation such as RFCs or
-standards.
-
-If you have a mailing list set up for your module, mention it here.
-
-If you have a web site set up for your module, mention it here.
+www.eucalyptus.com
 
 =head1 AUTHOR
 
