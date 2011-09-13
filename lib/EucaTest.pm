@@ -6,7 +6,7 @@ use warnings;
 
 use Cwd qw(abs_path);
 
-use lib $ENV{PWD} . '/../share/perl_lib/EucaTest/lib/Net-OpenSSH-0.52/lib';
+use lib 'Net-OpenSSH-0.52/lib';
 
 
 require Exporter;
