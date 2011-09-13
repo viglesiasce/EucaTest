@@ -578,8 +578,8 @@ sub run_instance{
 		
 		pass("Instance $instance_id started with emi $emi at $instance[9] with IP= $ip");
 		
-		
-		while ( $state eq "pending"){
+		my $count = 0;
+		while ( ($state eq "pending") && ($count < 15) ){
 			test_name("Polling every 20s until instance in running state");
 			sleep 20;
 			
@@ -588,6 +588,7 @@ sub run_instance{
 				fail("Could not find the instance in the describe instances pool");
 				return -1;
 			}
+			$count++;
 		}
 		
 		if( $state ne "running"){
