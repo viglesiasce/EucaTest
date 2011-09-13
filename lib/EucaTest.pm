@@ -544,7 +544,7 @@ sub upload_euca_image{
 	my @eki = split(/\s/, $eki_result[0]);
 	my @eri = split(/\s/, $eri_result[0]);
 	
-	$self->sys("$self->{TOOLKIT}bundle-image -i $dir/$image[0] --ramdisk $eri[1] --kernel $eki[1]");
+	$self->sys("$self->{TOOLKIT}bundle-image -i $dir/$dir.img --ramdisk $eri[1] --kernel $eki[1]");
 	$self->sys("$self->{TOOLKIT}upload-bundle -b $prefix-image-bucket -m /tmp/$image[0].manifest.xml");
 	my @emi_result = $self->sys("$self->{TOOLKIT}register $prefix-image-bucket/$image[0].manifest.xml");
 	my @emi = split(/\s/, $emi_result[0]);
