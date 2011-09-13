@@ -14,7 +14,7 @@ use File::Spec;
 use Cwd ();
 use Scalar::Util ();
 use Errno ();
-use Net::OpenSSH::Constants qw(:error);
+require 'OpenSSH/Constants.pm';
 
 sub _debug { print STDERR '# ', (map { defined($_) ? $_ : '<undef>' } @_), "\n" }
 
