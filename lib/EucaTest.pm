@@ -215,6 +215,56 @@ sub sys {
 	
 }
 
+sub read_input_file{
+	my $self = shift;
+	my $filename = shift;
+	my $is_memo = 0;
+	my $memo = "";
+	my %CLC;
+	open( INPUT, "< $filename" ) || die $!;
+
+	my $line;
+	while( $line = <INPUT> ){
+		chomp($line);
+		if( $is_memo ){
+			if( $line ne "END_MEMO" ){
+				$memo .= $line . "\n";
+			};
+		};
+
+        	if( $line =~ /^([\d\.]+)\t(.+)\t(.+)\t(\d+)\t(.+)\t\[(.+)\]/ ){
+			my $qa_ip = $1;
+			my $qa_distro = $2;
+			my $qa_distro_ver = $3;
+			my $qa_arch = $4;
+			my $qa_source = $5;
+			my $qa_roll = $6;
+
+			my $this_roll = lc($6);
+			if( $this_roll =~ /clc/ ){
+				print "\n";
+				print "IP $qa_ip [Distro $qa_distro, Version $qa_distro_ver, ARCH $qa_arch] is built from $qa_source as Eucalyptus-$qa_roll\n";
+				$CLC{'QA_DISTRO'} = $qa_distro;
+				$CLC{'QA_DISTRO_VER'} = $qa_distro_ver;
+				$CLC{'QA_ARCH'} = $qa_arch;
+				$CLC{'QA_SOURCE'} = $qa_source;
+				$CLC{'QA_ROLL'} = $qa_roll;
+				$CLC{'QA_IP'} = $qa_ip;
+			};
+		}elsif( $line =~ /^MEMO/ ){
+			$is_memo = 1;
+		}elsif( $line =~ /^END_MEMO/ ){
+			$is_memo = 0;
+		};
+	};	
+
+	close(INPUT);
+
+	$CLC{'QA_MEMO'} = $memo;
+
+	return %CLC;
+};
+
 sub get_cred {
   my($self, $account, $user) = @_;
   my $cred_dir = "eucarc-$account-$user";
