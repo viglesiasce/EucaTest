@@ -6,7 +6,7 @@ use warnings;
 
 use Cwd qw(abs_path);
 
-use lib 'Net-OpenSSH-0.52/lib';
+use lib abs_path('Net-OpenSSH-0.52/lib');
 
 
 require Exporter;
@@ -576,7 +576,10 @@ sub run_instance{
 		test_name("Sleeping 20 seconds then checking instance state");
 		sleep 20;
 		my ($emi, $ip, $state) = $self->get_instance_info($instance_id);
-		
+		if ( $emi == -1){
+			fail ("Could not find the instance in the describe instances pool after issuing run and waiting 20s");
+			return -1;
+		}
 		pass("Instance $instance_id started with emi $emi at $instance[9] with IP= $ip");
 		
 		my $count = 0;
