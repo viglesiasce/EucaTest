@@ -584,7 +584,7 @@ sub run_instance{
 			sleep 20;
 			
 			($emi, $ip, $state) = $self->get_instance_info($instance_id);
-			if( $emi =~ /emi/){
+			if( $emi !~ /emi/){
 				fail("Could not find the instance in the describe instances pool");
 				return -1;
 			}
