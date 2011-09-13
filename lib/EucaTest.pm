@@ -50,7 +50,7 @@ sub new{
 			$ssh->error and
    			fail( $ssh->error);
 		}else{
-			$ssh =  Net::OpenSSH->new($host);
+			$ssh =  Net::OpenSSH->new($host,  master_opts => [-o => "StrictHostKeyChecking=no" ] );
 			$ssh->error and
    			fail( $ssh->error);
 		}
