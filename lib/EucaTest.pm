@@ -8,7 +8,7 @@ use warnings;
 #use lib "$FindBin::Bin/./Net-OpenSSH-0.52/lib";
 
 
-require 'Net-OpenSSH-0.52/lib/Net/OpenSSH.pm';
+require './Net-OpenSSH-0.52/lib/Net/OpenSSH.pm';
 require Exporter;
 
 
