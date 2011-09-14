@@ -183,14 +183,14 @@ sub sys {
     
 	if( defined  $self->{SSH} ){
 		
-		 print("[REMOTE COMMAND] $original_cmd\n");
-		 # 
+		 print("[CREDS: $self->{CREDPATH} REMOTE COMMAND] $cmd\n");
+		  # 
 	
 		  @output =  $self->{SSH}->capture( $cmd);
  		  #$self->{SSH}->error and fail( "SSH ERROR: " . $self->{SSH}->error);
 		 
 	}else{
-		print("[LOCAL COMMAND] $original_cmd\n");
+		print("[CREDS: $self->{CREDPATH} LOCAL COMMAND] $cmd\n");
 		
 		@output = `$cmd`;
 	}
