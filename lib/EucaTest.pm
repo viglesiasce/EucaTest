@@ -30,7 +30,7 @@ our @EXPORT = qw(
 
 our $VERSION = '0.01';
 
-
+our $ofile = "ubero";
 sub new{
 	my $ssh;
 	my $class = shift;
@@ -267,6 +267,33 @@ sub read_input_file{
 	return %CLC;
 };
 
+sub piperun {
+	my $self = shift;
+    my $cmd = shift @_;
+    my $pipe = shift @_;
+    my $uberofile = shift @_ || "/tmp/uberofile.$$";
+    my $pipestr = "";
+
+    if ($pipe) {
+	$pipestr = "| $pipe";
+    }
+    
+    my @buf = $self->sys("$cmd > /tmp/tout.$$ 2>&1");
+    my $retcode = ${^CHILD_ERROR_NATIVE};
+
+    chomp(my $buf = `cat /tmp/tout.$$ $pipestr`);
+    my $pipecode = system("cat /tmp/tout.$$ $pipestr >/dev/null 2>&1");
+
+    system("echo '*****' >> $uberofile");
+    system("echo CMD=$cmd >> $uberofile");
+    my $rc = system("cat /tmp/tout.$$ >> $uberofile");
+    unlink("/tmp/tout.$$");
+
+    sleep(1);
+    return($retcode, $pipecode, $buf);
+}
+
+
 sub get_cred {
   my($self, $account, $user) = @_;
   my $cred_dir = "eucarc-$account-$user";
@@ -364,6 +391,14 @@ sub delete_keypair{
 		fail("Delete keypair command did not return the keypair which was deleted");
 		return @output;
 	}
+}
+
+sub get_keypair{
+	my $self = shift;
+	my $keyname = shift;
+	my $filepath = "$keyname.priv";
+	my @key = $self->sys("cat $filepath");
+	return "@key";
 }
 
 sub found {
@@ -483,6 +518,29 @@ sub get_emi{
 	
 }
 
+sub discover_emis {
+    my $self = shift;
+   
+    my $cmd = "$self->{TOOLKIT}describe-images";
+    my ($crc, $rc, $buf) = piperun($cmd, "grep IMAGE | grep -i 'mi-' | awk '{print \$2}'", "$ofile");
+    if ($rc) {
+		fail("Failed in running describe images when trying to discover EMIs");
+		return -1;
+    }
+    my @emi_list= ();
+    my @output = split(/\s+/, $buf);
+    foreach my $emi (@output) {
+		if (!$emi  || $emi eq "" || !($emi =~ /.*mi-.*/)) {
+	    	print "WARN: emis=@output, emi=$emi\n";
+		} 
+		else {
+	    	push(@emi_list, $emi);
+		}
+    }
+
+    return @emi_list;
+}
+
 ### TAKES in the url to a euca packaged image
 sub download_euca_image{
 	my $self = shift;
@@ -567,6 +625,75 @@ sub upload_euca_image{
 	
 	
 	return ($emi[1], $eri[1], $eki[1]);
+	
+}
+
+sub deregister_image{
+	my $self = shift;
+	my $image = shift;
+	test_name("Deregistering image $image");
+	
+	## Execute deregister command
+	my @dereg1 = $self->sys("$self->{TOOLKIT}deregister $image");
+	
+	##If there was no output fail
+	if ( @dereg1 < 1){
+		fail("Deregister image the first time did not return any output");
+		return -1;
+	}else{
+		## Was the image in the output
+		if( $dereg1[0] =~ /$image/){
+			my @desc1 = $self->sys("$self->{TOOLKIT}describe-images | grep $image");
+			## Is the image still in the desc-images output
+			if( @desc1 < 1){
+				fail( "Image $image removed from describe images on first deregister");
+				return -1;
+			}else{
+				## Need to deregister a second time to remove it if its in deregistered 
+				if( $desc1[0] =~ /deregistered/ ){
+					my @dereg2 = $self->sys("$self->{TOOLKIT}deregister $image");
+					
+					if( @dereg2 < 1 ){
+						fail("Deregister image the second time did not return any output");
+						return -1;
+					}else{
+						my @desc2 = $self->sys("$self->{TOOLKIT}describe-images | grep $image");
+						if( @desc2 < 1){
+							pass("Successfully deregistered image $image");
+							my @image_info = split(/\s/,$desc1[0]);
+							my @bucket = split(/\//, $image_info[2]);
+							$self->delete_bundle("$bucket[0]");
+							return $image;
+						}else{
+							fail("Image still in store\n@desc2");
+							return -1;
+						}
+					}
+					
+				}else{
+					fail("Image not in deregistered state\n$desc1[0]\n");
+					return -1;
+				}
+				
+			}
+			
+		}
+	}
+	return -1;
+	
+}
+
+sub delete_bundle{
+	my $self = shift;
+	my $bundle = shift;
+	my @deletebundle = $self->sys("$self->{TOOLKIT}delete-bundle --clear -b $bundle");
+	if( @deletebundle <1){
+		pass("Delete bundle seems to have succeeded");
+		return 0;
+	}else{
+		fail("Output returned from delete-bundle\n@deletebundle");
+		return -1;
+	}
 	
 }
 
@@ -684,6 +811,14 @@ sub teardown_instance{
 	
 }
 
+sub reboot_instance{
+	my $self = shift;
+	my $instance_id = shift;
+	
+	my @output = $self->sys("$self->{TOOLKIT}reboot-instances $instance_id");
+	
+}
+
 sub create_volume{
 	my $self = shift;
 	my $zone = shift;
@@ -780,7 +915,29 @@ sub detach_volume{
 		return -1;
 	}
 	
-	return 1;
+	return $volume;
+}
+
+sub delete_snapshot {
+	my $self = shift;
+    my $snap = shift;
+
+    if ($snap !~ /snap-/ ) {
+		fail("ERROR: invalid snapshot ID '$snap' for delete_snapshot");
+		return -1;
+    }
+
+    my $cmd = "$self->{TOOLKIT}delete-snapshot $snap";
+    my ($crc, $rc, $buf) = piperun($cmd, "grep SNAPSHOT | awk '{print \$2}'", "$ofile");
+    if ($rc || !$buf || !$buf =~ "snap-") {
+	 	fail("Deleting snapshot did not return snap-id\n");
+	 	return -1;
+    }else{
+    	
+    }
+   
+    
+    return $snap;
 }
 
 #### EUARE COMMANDS ########################
