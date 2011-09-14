@@ -18,7 +18,7 @@ our @ISA = qw(Exporter);
 # This allows declaration	use EucaTest ':all';
 # If you do not need this, moving things directly into @EXPORT or @EXPORT_OK
 # will save memory.
-our %EXPORT_TAGS = ( 'all' => [ qw(
+our %EXPORT_TAGS = ( 'all' => [ qw( test_name fail pass
 	
 ) ] );
 
@@ -42,10 +42,12 @@ sub new{
 		print "Creating an SSH connection to $host\n";
 		## are we authenticating with keys or with password alone
 		if( defined $keypath){
+			 test_name("Creating a keypair authenticated SSH connection to $host\n");
 			$ssh =  Net::OpenSSH->new( $host, key_path => $keypath ,  master_opts => [-o => "StrictHostKeyChecking=no" ]  );
 			$ssh->error and
    			fail( $ssh->error);
 		}else{
+			test_name( "Creating a password authenticated SSH connection to $host\n");
 			$ssh =  Net::OpenSSH->new($host,  master_opts => [-o => "StrictHostKeyChecking=no" ] );
 			$ssh->error and
    			fail( $ssh->error);
@@ -156,7 +158,11 @@ sub get_credpath{
 sub set_credpath{
 	my $self = shift;
 	my $credpath = shift;
+	$self->sys("cat $credpath/eucarc  | grep -v EUCA_KEY_DIR= > $credpath/eucarc.tmp");
+    $self->sys("echo EUCA_KEY_DIR=$credpath > $credpath/eucarc.dir; cat $credpath/eucarc.tmp >> $credpath/eucarc.dir; mv $credpath/eucarc.dir $credpath/eucarc");
+	
 	$self->{CREDPATH} = $credpath;
+
 	return 0;
 }
 
@@ -183,14 +189,14 @@ sub sys {
     
 	if( defined  $self->{SSH} ){
 		
-		 print("[CREDS: $self->{CREDPATH} REMOTE COMMAND] $cmd\n");
+		 print("[REMOTE] $original_cmd\n");
 		  # 
 	
 		  @output =  $self->{SSH}->capture( $cmd);
  		  #$self->{SSH}->error and fail( "SSH ERROR: " . $self->{SSH}->error);
 		 
 	}else{
-		print("[CREDS: $self->{CREDPATH} LOCAL COMMAND] $cmd\n");
+		print("[LOCAL] $original_cmd\n");
 		
 		@output = `$cmd`;
 	}
@@ -574,13 +580,17 @@ sub run_instance{
 #	$self->add_group($group);
 	test_name("Sending run instance command");
 	my @output =  $self->sys("$self->{TOOLKIT}run-instances -k $keypair -g $group $emi | grep INSTANCE");
+	if ( @output < 1){
+		fail("Initial attempt at running instance returned nothing");
+		return -1;
+	}
 	if ($output[0] =~ /pending/){
 		my @instance = split(' ', $output[0]);
 		my $instance_id = $instance[1];
 		test_name("Sleeping 20 seconds then checking instance state");
 		sleep 20;
 		my ($emi, $ip, $state) = $self->get_instance_info($instance_id);
-		if ( $emi == -1){
+		if ( $emi !~ /emi-/){
 			fail ("Could not find the instance in the describe instances pool after issuing run and waiting 20s");
 			return -1;
 		}
@@ -600,12 +610,12 @@ sub run_instance{
 		}
 		
 		if( $state ne "running"){
-			fail("Instance went from pending to $state");
-			return -1;
+			fail("Instance went from pending to $state after 300s");
+			return ($instance_id, $emi, $ip, $state);
 		}else{
 			### Returns ($instance_id,  $emi, $ip);
 			pass("Instance is now in $state state");
-			return ($instance_id,  $emi, $ip);
+			return ($instance_id,  $emi, $ip, $state);
 		}
 		
 		
