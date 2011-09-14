@@ -294,6 +294,13 @@ sub download_cred{
 	return $self->{CREDPATH};
 }
 
+sub send_cred{
+	my $self = shift;
+	my $host = shift;
+	$self->sys("scp -r $self->{CREDPATH} $host");
+	return 0;
+}
+
 sub add_keypair{
 	my $self = shift;
 	my $keyname = shift;
