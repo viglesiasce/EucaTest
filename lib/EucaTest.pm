@@ -298,7 +298,7 @@ sub send_cred{
 	my $self = shift;
 	my $host = shift;
 	$self->sys("scp -r $self->{CREDPATH} $host");
-	return 0;
+	return $self->{CREDPATH};
 }
 
 sub add_keypair{
