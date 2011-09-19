@@ -84,6 +84,17 @@ sub new{
 	
 	my $self  = { SSH => $ssh , CREDPATH => $credpath, TIMEOUT => $timeout, EUCALYPTUS => $eucadir,  VERIFYLEVEL=> $verify_level, TOOLKIT => $toolkit};
 	bless $self;
+	
+	if( defined $ssh && $self->get_credpath eq ""){
+		my $admin_credpath = $self->get_cred("eucalyptus", "admin");
+		
+		if($admin_credpath !~ /eucarc/ ){
+			fail("Failed to download credentials");
+		}else{
+			$self->set_credpath($admin_credpath);
+		}
+	}
+	
 	return $self;
 }
 
@@ -163,6 +174,13 @@ sub set_credpath{
 	
 	$self->{CREDPATH} = $credpath;
 
+	return 0;
+}
+
+sub cleanup{
+	my $self = shift;
+	$self->sys("rm -f *.priv");
+    $self->sys("rm -rf $self->{CREDPATH}");
 	return 0;
 }
 
@@ -701,32 +719,66 @@ sub run_instance{
 	my $self = shift;
 	my $keypair = shift;
 	my $group = shift;
+	my $OPTS = shift;
+	my $time= time();
+	if( !defined $keypair){
+		$keypair = $self->add_keypair("keypair-" . $time);
+	}
+	if ( !defined $group){
+		$group = "group-" . $time;
+	    $self->add_group($group );
+		
+	}
 	my $address = $self->allocate_address();
 	my $emi = $self->get_emi();
 #	my $keypath =$self->add_keypair($keypair);
 #	$self->add_group($group);
 	test_name("Sending run instance command");
-	my @output =  $self->sys("$self->{TOOLKIT}run-instances -k $keypair -g $group $emi | grep INSTANCE");
+	my $base_command = "$self->{TOOLKIT}run-instances -k $keypair -g $group $emi";
+	my @flags = ();
+	
+	my @output =  $self->sys($base_command);
 	if ( @output < 1){
 		fail("Initial attempt at running instance returned nothing");
 		return -1;
 	}
-	if ($output[0] =~ /pending/){
-		my @instance = split(' ', $output[0]);
+	
+	### There was output to the run instance command, check if it includes INSTANCE  
+	my @instance = grep(/INSTANCE/, @output);
+	if( @instance < 1){
+		fail("Initial attempt at running instance returned:\n@output");
+		return -1;
+	}
+	
+	### Check for state pending of the INSTANCE right after the run instance command  
+	if ($instance[0] =~ /pending/){
+		my @instance = split(' ', $instance[0]);
 		my $instance_id = $instance[1];
-		test_name("Sleeping 20 seconds then checking instance state");
+		
+		### Waiting for 20s 
+		test_name("Sleeping 20 seconds for instance to get its IP");
 		sleep 20;
 		my ($emi, $ip, $state) = $self->get_instance_info($instance_id);
+		## If emi- is found then we can assume we have the rest of the info as well
 		if ( $emi !~ /emi-/){
 			fail ("Could not find the instance in the describe instances pool after issuing run and waiting 20s");
 			return -1;
 		}
+		## If we have the info make sure that the Public IP is not stuck on 0.0.0.0
+		if( $ip =~ /0\.0\.0\.0/){
+			fail ("Instance did not get an address within 20s");
+			return -1;
+		}
+		
 		pass("Instance $instance_id started with emi $emi at $instance[9] with IP= $ip");
 		
+		
+		### Poll the instance every 20s for 300s until it leaves the pending state
+		my $period = 20;
 		my $count = 0;
 		while ( ($state eq "pending") && ($count < 15) ){
 			test_name("Polling every 20s until instance in running state");
-			sleep 20;
+			sleep $period;
 			
 			($emi, $ip, $state) = $self->get_instance_info($instance_id);
 			if( $emi !~ /emi/){
@@ -736,13 +788,14 @@ sub run_instance{
 			$count++;
 		}
 		
+		### If the instance is not running after 300s there was an error
 		if( $state ne "running"){
 			fail("Instance went from pending to $state after 300s");
-			return ($instance_id, $emi, $ip, $state);
+			return ($instance_id, $emi, $ip, $state, $keypair);
 		}else{
-			### Returns ($instance_id,  $emi, $ip);
-			pass("Instance is now in $state state");
-			return ($instance_id,  $emi, $ip, $state);
+			### Returns ($instance_id,  $emi, $ip, $state);
+			pass("Instance is now in $state state after " . ( $count * $period ) . " seconds");
+			return ($instance_id,  $emi, $ip, $state, $keypair);
 		}
 		
 		
@@ -854,7 +907,7 @@ sub create_volume{
 	}
 	else{
 		sleep $vol_timeout;
-		if ( ! $self->found("$self->{TOOLKIT}describe-volumes", qr/$vol_id[1]/) ){
+		if ( ! $self->found("$self->{TOOLKIT}describe-volumes", qr/$vol_id[1].*available/) ){
 			fail("Unable to create volume");
 			return -1;
 		}
@@ -874,8 +927,8 @@ sub delete_volume{
 	if( !$self->found("$self->{TOOLKIT}delete-volume $volume", qr/^VOLUME\s+$volume/) ){
 		fail("Failed to delete volume");
 		return -1;
-	}elsif( $self->found("$self->{TOOLKIT}describe-volumes", qr/^VOLUME\s+$volume/ ) ){
-		fail("After delete volume still exists");
+	}elsif( $self->found("$self->{TOOLKIT}describe-volumes", qr/^VOLUME\s+$volume.*available/ ) ){
+		fail("After delete volume still available");
 		return -1;
 	}else{
 		return $volume;
@@ -928,8 +981,11 @@ sub delete_snapshot {
     }
 
     my $cmd = "$self->{TOOLKIT}delete-snapshot $snap";
-    my ($crc, $rc, $buf) = piperun($cmd, "grep SNAPSHOT | awk '{print \$2}'", "$ofile");
-    if ($rc || !$buf || !$buf =~ "snap-") {
+    my @del_out = $self->sys($cmd);
+    if (@del_out < 1){
+    	fail("Delete snapshot returned no output");
+    	return -1;
+    }elsif ( $del_out[0] !~ "snap-") {
 	 	fail("Deleting snapshot did not return snap-id\n");
 	 	return -1;
     }else{
