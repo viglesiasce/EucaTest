@@ -249,7 +249,7 @@ sub sys {
 		return @output;
 	}
 	else {		# didn't
-		print "OUTPUT:\n" . "@output\n";
+		print  "@output\n";
 		return @output;
     
 	}
@@ -871,7 +871,7 @@ sub get_instance_info{
 		}else{
 			my @info = split(' ', $running[0]);
 			### Returns ($emi, $ip, $state);
-			return ($info[2], $info[3], $info[5]);
+			return ($info[2], $info[3], $info[5], $info[6]);
 		}
 }
 
@@ -888,9 +888,18 @@ sub teardown_instance{
 sub reboot_instance{
 	my $self = shift;
 	my $instance_id = shift;
-	
+	my ($emi, $ip, $state, $keypair) = $self->get_instance_info($instance_id);
+	my @uptime_old = $self->sys("ssh root\@$ip -i $keypair.priv \"cat /proc/uptime | awk \'{print \$1}\'\"");
 	my @output = $self->sys("$self->{TOOLKIT}reboot-instances $instance_id");
-	
+	sleep 80;
+	my @uptime_new = $self->sys("ssh root\@$ip -i $keypair.priv \"cat /proc/uptime | awk \'{print \$1}\'\"");
+	if( $uptime_old[0] > $uptime_new[0]) {
+		pass("Instance rebooted. Old uptime: $uptime_old[0]  New uptime:  $uptime_new[0]");
+		return $instance_id;
+	}else{
+		fail("Uptime is greater than before reboot. Must not have rebooted instance properly");
+		return -1;
+	}
 }
 
 sub create_volume{
@@ -990,6 +999,64 @@ sub detach_volume{
 	}
 	
 	return $volume;
+}
+
+sub create_snapshot{
+		my $self = shift;
+        my $volume = shift;
+        my @create_output = $self->sys("euca-create-snapshot $volume");
+        my $poll_interval = 20;
+        my $poll_count = 15;
+        ### Check that there was output from the create command
+        if( @create_output < 1){
+        	fail("Create snapshot returned without output");
+        	return -1;
+        }{
+        	### If there was output check that it shows the SNAPSHOT as pending and the current percentage is increasing
+        	if( $create_output[0] =~ /^SNAPSHOT.*pending/){
+        		my @snapshot_info = split(/ /,$create_output[0] );
+        		my $snap_id = $snapshot_info[1];
+        		pass("Snapshot $snap_id being created and in pending state");
+        		my $old_percentage = 0;
+        		my $current_state = "pending";
+        		
+        		
+        		while( ($poll_count > 0) && ($current_state ne "completed")){
+        			sleep $poll_interval;
+        			my @snapshot_poll = $self->sys("euca-describe-snapshots | grep $snap_id");
+        			if( @snapshot_poll < 1){
+        				fail("Did not find $snap_id in describe-snapshots");
+        				return -1;
+        			}
+        			my @snapshot_info = split(/ /,$snapshot_poll[0] );
+        			my @new_percentage = split (/%/,$snapshot_info[5]);
+        			if( $new_percentage[0] > $old_percentage){
+        				test_name("Snapshot went from $old_percentage to $new_percentage[0]");
+        				$old_percentage = $new_percentage[0];
+        				$current_state = $snapshot_info[3] ;
+        				$poll_count--;
+        				
+        			}else{
+        				fail("Snapshot at same percentage after $poll_interval");
+        				return -1;
+        			}
+        			
+        		}
+        		
+        		if( $current_state eq "completed"){
+        			pass("Successfully created snapshot $snap_id");
+        			return $snap_id;
+        		}else{
+        			fail("Snapshot creation failed");
+        			return -1;
+        		}
+        		
+        	
+        	}else{
+        		fail("Snapshot not in pending state after create");
+        		return -1;
+        	}
+        }
 }
 
 sub delete_snapshot {
