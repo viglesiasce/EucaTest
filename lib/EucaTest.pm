@@ -29,7 +29,7 @@ our @EXPORT = qw(
 );
 
 our $VERSION = '0.01';
-
+my $exit_on_fail = 0;
 our $ofile = "ubero";
 sub new{
 	my $ssh;
@@ -85,8 +85,11 @@ sub new{
 	if( !defined $toolkit){
 		$toolkit = "euca-";
 	}
-	
-	my $self  = { SSH => $ssh , CREDPATH => $credpath, TIMEOUT => $timeout, EUCALYPTUS => $eucadir,  VERIFYLEVEL=> $verify_level, TOOLKIT => $toolkit, DELAY => $delay};
+	$exit_on_fail = $opts->{'exit_on_fail'};	
+	if( !defined $exit_on_fail){
+		$exit_on_fail = 0;
+	}
+	my $self  = { SSH => $ssh , CREDPATH => $credpath, TIMEOUT => $timeout, EUCALYPTUS => $eucadir,  VERIFYLEVEL=> $verify_level, TOOLKIT => $toolkit, DELAY => $delay, EXIT_ON_FAIL => $exit_on_fail};
 	bless $self;
 	
 	if( defined $ssh && $self->get_credpath eq ""){
@@ -105,7 +108,9 @@ sub new{
 sub fail {
   my($message) = @_;
   print("^^^^^^[TEST_REPORT] FAILED - $message^^^^^^\n");
-  #exit(1);
+  if ($exit_on_fail){
+  	exit(1);
+  }
 }
 
 # Print formatted success message
