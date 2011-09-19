@@ -61,6 +61,10 @@ sub new{
 	if( !defined $credpath){
 		 $credpath = "";
 	}
+	my $delay = $opts->{'delay'};
+	if( !defined $delay){
+		 $delay = 0;
+	}
 	
 	my $timeout = $opts->{'timeout'};
 	if( !defined $timeout){
@@ -82,7 +86,7 @@ sub new{
 		$toolkit = "euca-";
 	}
 	
-	my $self  = { SSH => $ssh , CREDPATH => $credpath, TIMEOUT => $timeout, EUCALYPTUS => $eucadir,  VERIFYLEVEL=> $verify_level, TOOLKIT => $toolkit};
+	my $self  = { SSH => $ssh , CREDPATH => $credpath, TIMEOUT => $timeout, EUCALYPTUS => $eucadir,  VERIFYLEVEL=> $verify_level, TOOLKIT => $toolkit, DELAY => $delay};
 	bless $self;
 	
 	if( defined $ssh && $self->get_credpath eq ""){
@@ -125,6 +129,16 @@ sub set_verifylevel{
 	my $self = shift;
 	my $level = shift;
 	$self->{VERIFYLEVEL}= $level;
+	return 0;
+}
+sub get_delay{
+	my $self = shift;
+	return $self->{DELAY};
+}
+sub set_delay{
+	my $self = shift;
+	my $delay = shift;
+	$self->{DELAY}= $delay;
 	return 0;
 }
 sub get_toolkit{
@@ -192,6 +206,8 @@ sub sys {
   if( $self->{CREDPATH} ne ""){
 		$cmd = ". " . $self->{CREDPATH} ."/eucarc && " . $cmd;
   }
+  
+  sleep($self->{DELAY});
   my $systimeout;
   if(defined $timeout){
   	$systimeout = $timeout;
