@@ -6,7 +6,7 @@ use warnings;
 
 use Net::OpenSSH;
 require Exporter;
-
+#use Data::Dumper;
 
 
 our @ISA = qw(Exporter);
@@ -32,6 +32,9 @@ our $VERSION = '0.01';
 my $exit_on_fail = 0;
 my $fail_count = 0;
 our $ofile = "ubero";
+my $CLC_INFO = {};
+my @running_log;
+
 sub new{
 	my $ssh;
 	my $class = shift;
@@ -204,18 +207,81 @@ sub set_credpath{
 sub cleanup{
 	my $self = shift;
  	my $tc_id = shift;
- 	if( defined $tc_id){
+ 	my $tplan_id = shift;
+ 	if( defined $tc_id && defined $tplan_id){
  		my $status = 'f';
  		if( $fail_count == 0){
  			$status= "p";
  		}
- 		$self->sys("ssh root\@192.168.51.187 -o StrictHostKeyChecking=no ./testlink/genericCommand.pl tl.reportTCResult \"devKey=5d2218984547b22fd1be52be127c2c32,testcaseexternalid=$tc_id,testplanid=322,status=$status,guess=true,platformid=1,notes=something\"");
+ 		my $notes ="";
+ 		my $platform = 1;
+ 		
+ 		if( defined $CLC_INFO->{"QA_DISTRO"}) {
+ 			    my $qa_distro =  $CLC_INFO->{"QA_DISTRO"};
+				my $qa_distro_ver = $CLC_INFO->{'QA_DISTRO_VER'} ;
+				my $qa_arch = $CLC_INFO->{'QA_ARCH'};
+				my $qa_source = $CLC_INFO->{'QA_SOURCE'} ;
+				my $qa_roll =$CLC_INFO->{'QA_ROLL'} ;
+				my $qa_ip =$CLC_INFO->{'QA_IP'} ;
+				
+			#[ID: 1 ] CentOS 5 64bit 		
+			#[ID: 2 ] CentOS 5 32bit 		
+			#[ID: 3 ] RHEL 5 32bit 		
+			#[ID: 4 ] Ubuntu Lucid 64bit 				
+			#[ID: 5 ] Ubuntu Lucid 32bit 		
+			#[ID: 7 ] RHEL 5 64bit 		
+			#[ID: 8 ] Debian Squeeze 64bit 		
+			
+			if( ($qa_distro =~ /CENTOS/i) && ( $qa_arch =~ /64/)){
+				$platform = 1;
+			}
+			elsif( ($qa_distro =~ /CENTOS/i) && ( $qa_arch =~ /32/)){
+				$platform = 2;
+			}
+			elsif( ($qa_distro =~ /RHEL/i) && ( $qa_arch =~ /64/)){
+				$platform = 7;
+			}
+			elsif( ($qa_distro =~ /RHEL/i) && ( $qa_arch =~ /32/)){
+				$platform = 3;
+			}
+			elsif( ($qa_distro =~ /UBUNTU/i) && ( $qa_arch =~ /64/)){
+				$platform = 4;
+			}
+			elsif( ($qa_distro =~ /UBUNTU/i) && ( $qa_arch =~ /32/)){
+				$platform = 5;
+			}
+			elsif( ($qa_distro_ver =~ /DEBIAN/i) && ( $qa_arch =~ /64/)){
+				$platform = 8;
+			}
+			
+			
+ 			$notes .= "IP $qa_ip [Distro $qa_distro, Version $qa_distro_ver, ARCH $qa_arch] is built from $qa_source as Eucalyptus-$qa_roll\n";
+ 			
+ 		}
+ 		#my $html_result = "";
+ 		#foreach my $line (@running_log){
+ 		#	$line =~ s/\n/</g;
+ 		#	$line =~ s/\t//g;
+ 		#	$html_result .= $line;
+ 		#}
+ 		my $run_file = "run-$tc_id-" . time() .".log";
+ 		open FILE, ">", "$run_file" or die $!;
+ 		print FILE "$notes\n@running_log";
+ 		close FILE;
+ 		my @scp_result = `scp $run_file root\@192.168.51.187:$run_file`;
+ 		$self->sys("ssh root\@192.168.51.187 -o StrictHostKeyChecking=no \'./testlink/update_testcase.pl $run_file testcaseexternalid=$tc_id,testplanid=$tplan_id,status=$status,guess=true,platformid=$platform\'");
+ 		$self->sys("ssh root\@192.168.51.187 -o StrictHostKeyChecking=no \'rm -f *.log\'"); 
  	}
 	$self->sys("rm -f *.priv");
     $self->sys("rm -rf $self->{CREDPATH}");
+    my @rm_log = `rm *.log`;
 	return 0;
 }
-
+sub set_clc_info{
+	my $self = shift;
+	$CLC_INFO = shift;
+	return 0;	
+}
 sub sys {
   my $self = shift;
   my $cmd = shift;
@@ -243,14 +309,16 @@ sub sys {
 		
 		 print("[REMOTE] $original_cmd\n");
 		  # 
-	
+		 push(@running_log, "[REMOTE] $original_cmd\n");
 		  @output =  $self->{SSH}->capture( $cmd);
+		 
  		  #$self->{SSH}->error and fail( "SSH ERROR: " . $self->{SSH}->error);
 		 
 	}else{
 		print("[LOCAL] $original_cmd\n");
-		
+		push(@running_log, "[LOCAL] $original_cmd\n");
 		@output = `$cmd`;
+		
 	}
 	alarm(0);
 		
@@ -258,11 +326,15 @@ sub sys {
 	if ($@) {
 		die unless $@ eq "alarm\n"; # propagate unexpected errors
 		# timed out
+		push(@running_log,  @output);
+		print  "@output\n"; 
 		fail("Timeout occured after $systimeout seconds\n"); 
+		
 		return @output;
 	}
 	else {		# didn't
 		print  "@output\n";
+		push(@running_log, @output);
 		return @output;
     
 	}
@@ -315,8 +387,10 @@ sub read_input_file{
 	close(INPUT);
 
 	$CLC{'QA_MEMO'} = $memo;
+	
+	
 
-	return %CLC;
+	return \%CLC;
 };
 
 sub piperun {
@@ -947,13 +1021,13 @@ sub create_volume{
 	
 	my @vol_id = split(/\s+/, $vol_create[0]);
 	
-	if ( $vol_id[3] !~ /creating/ ){
+	if ( $vol_create[0] !~ /$vol_id[1].*creating.*/ ){
 		fail("After running volume-create output does not show $vol_id[1] as creating");
 		return -1;
 	}
 	else{
 		sleep $vol_timeout;
-		if ( ! $self->found("$self->{TOOLKIT}describe-volumes", qr/$vol_id[1].*available/) ){
+		if ( ! $self->found("$self->{TOOLKIT}describe-volumes", qr/$vol_id[1].*available.*/) ){
 			fail("Unable to create volume");
 			return -1;
 		}
