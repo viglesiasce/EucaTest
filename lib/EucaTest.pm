@@ -111,6 +111,7 @@ sub new{
 
 sub fail {
   my($message) = @_;
+  push(@running_log, "^^^^^^[TEST_REPORT] FAILED - $message^^^^^^\n");
   print("^^^^^^[TEST_REPORT] FAILED - $message^^^^^^\n");
   $fail_count++;
   if ($exit_on_fail){
@@ -121,6 +122,7 @@ sub fail {
 # Print formatted success message
 sub pass {
   my($message) = @_;
+  push(@running_log, "^^^^^^[TEST_REPORT] PASSED - $message^^^^^^\n\n");
   print("^^^^^^[TEST_REPORT] PASSED - $message^^^^^^\n\n");
   return 0;
 }
@@ -128,6 +130,7 @@ sub pass {
 # Print test case name (ie a description of the following steps)
 sub test_name {
   my($name) = @_;
+  push(@running_log, "******[TEST_REPORT] ACTION - $name ******\n");
   print("******[TEST_REPORT] ACTION - $name ******\n");
 }
 sub get_fail_count{
@@ -259,11 +262,11 @@ sub cleanup{
  			
  		}
  		#my $html_result = "";
- 		#foreach my $line (@running_log){
- 		#	$line =~ s/\n/</g;
+ 		foreach my $line (@running_log){
+ 			$line =~ s/\n/<br>/g;
  		#	$line =~ s/\t//g;
  		#	$html_result .= $line;
- 		#}
+ 		}
  		my $run_file = "run-$tc_id-" . time() .".log";
  		open FILE, ">", "$run_file" or die $!;
  		print FILE "$notes\n@running_log";
@@ -1027,7 +1030,7 @@ sub create_volume{
 	}
 	else{
 		sleep $vol_timeout;
-		if ( ! $self->found("$self->{TOOLKIT}describe-volumes", qr/$vol_id[1].*available.*/) ){
+		if ( ! $self->found("$self->{TOOLKIT}describe-volumes", qr/$vol_id[1].*$zone.*available.*/) ){
 			fail("Unable to create volume");
 			return -1;
 		}
