@@ -30,6 +30,7 @@ our @EXPORT = qw(
 
 our $VERSION = '0.01';
 my $exit_on_fail = 0;
+my $fail_count = 0;
 our $ofile = "ubero";
 sub new{
 	my $ssh;
@@ -89,7 +90,7 @@ sub new{
 	if( !defined $exit_on_fail){
 		$exit_on_fail = 0;
 	}
-	my $self  = { SSH => $ssh , CREDPATH => $credpath, TIMEOUT => $timeout, EUCALYPTUS => $eucadir,  VERIFYLEVEL=> $verify_level, TOOLKIT => $toolkit, DELAY => $delay, EXIT_ON_FAIL => $exit_on_fail};
+	my $self  = { SSH => $ssh , CREDPATH => $credpath, TIMEOUT => $timeout, EUCALYPTUS => $eucadir,  VERIFY_LEVEL=> $verify_level, TOOLKIT => $toolkit, DELAY => $delay, EXIT_ON_FAIL => $exit_on_fail, FAIL_COUNT=> $fail_count};
 	bless $self;
 	
 	if( defined $ssh && $self->get_credpath eq ""){
@@ -108,6 +109,7 @@ sub new{
 sub fail {
   my($message) = @_;
   print("^^^^^^[TEST_REPORT] FAILED - $message^^^^^^\n");
+  $fail_count++;
   if ($exit_on_fail){
   	exit(1);
   }
@@ -125,7 +127,10 @@ sub test_name {
   my($name) = @_;
   print("******[TEST_REPORT] ACTION - $name ******\n");
 }
-
+sub get_fail_count{
+	my $self = shift;
+	return $fail_count;
+}
 sub get_verifylevel{
 	my $self = shift;
 	return $self->{VERIFYLEVEL};
@@ -198,6 +203,14 @@ sub set_credpath{
 
 sub cleanup{
 	my $self = shift;
+ 	my $tc_id = shift;
+ 	if( defined $tc_id){
+ 		my $status = 'f';
+ 		if( $fail_count == 0){
+ 			$status= "p";
+ 		}
+ 		$self->sys("ssh root\@192.168.51.187 -o StrictHostKeyChecking=no ./testlink/genericCommand.pl tl.reportTCResult \"devKey=5d2218984547b22fd1be52be127c2c32,testcaseexternalid=$tc_id,testplanid=322,status=$status,guess=true,platformid=1,notes=something\"");
+ 	}
 	$self->sys("rm -f *.priv");
     $self->sys("rm -rf $self->{CREDPATH}");
 	return 0;
@@ -545,6 +558,10 @@ sub get_emi{
 		$cmd .= " | grep $filter";
 	}
 	my @output = $self->sys($cmd);
+	if( @output < 1){
+		fail("No EMI found");
+		return -1;
+	}
 	if($output[0] =~ /emi/){
 		my @emi = split(' ', $output[0] );
 		pass("Found EMI $emi[1]");
@@ -661,7 +678,6 @@ sub upload_euca_image{
 		fail("Image not uploaded properly");
 		return -1;
 	}
-	
 	
 	return ($emi[1], $eri[1], $eki[1]);
 	
