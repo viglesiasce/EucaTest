@@ -34,7 +34,7 @@ my $fail_count = 0;
 our $ofile = "ubero";
 my $CLC_INFO = {};
 my @running_log;
-
+open(STDERR, ">&STDOUT");
 sub new{
 	my $ssh;
 	my $class = shift;
@@ -133,6 +133,16 @@ sub test_name {
   push(@running_log, "******[TEST_REPORT] ACTION - $name ******\n");
   print("******[TEST_REPORT] ACTION - $name ******\n");
 }
+
+sub log{
+	my $self =shift;
+	my $message = shift;
+	push(@running_log, "$message\n");
+	print($message);
+	return 0;
+}
+
+
 sub get_fail_count{
 	my $self = shift;
 	return $fail_count;
@@ -212,10 +222,32 @@ sub cleanup{
  	my $tc_id = shift;
  	my $tplan_id = shift;
  	if( defined $tc_id && defined $tplan_id){
- 		my $status = 'f';
- 		if( $fail_count == 0){
+ 		
+ 		$self->update_testlink($tc_id, $tplan_id);
+ 	}
+	$self->sys("rm -f *.priv *.log");
+    $self->sys("rm -rf $self->{CREDPATH}");
+    my @rm_log = `rm *.log`;
+	return 0;
+}
+
+
+sub update_testlink{
+	my $self =shift;
+	my $tc_id = shift;
+	my $tplan_id = shift;
+	my $status = shift;
+	my $build = shift;
+	
+	### Get status from total fail_count
+	if( !defined $status){
+		$status = 'f';
+		if( $fail_count == 0){
  			$status= "p";
  		}
+	}
+	 
+ 		
  		my $notes ="";
  		my $platform = 1;
  		
@@ -258,28 +290,47 @@ sub cleanup{
 			}
 			
 			
- 			$notes .= "IP $qa_ip [Distro $qa_distro, Version $qa_distro_ver, ARCH $qa_arch] is built from $qa_source as Eucalyptus-$qa_roll\n";
+ 			#push(@running_log, "IP $qa_ip [Distro $qa_distro, Version $qa_distro_ver, ARCH $qa_arch] is built from $qa_source as Eucalyptus-$qa_roll\n");
  			
  		}
- 		#my $html_result = "";
+ 		### Add the entire config file to the top of the result
+ 		if( defined $CLC_INFO->{"TEST_NAME"}){
+ 			my $artifacts_link = "http://10.1.1.210/test_space/". $CLC_INFO->{"TEST_NAME"} . "/" . $CLC_INFO->{"UNIQUE_ID"} ;
+ 			$artifacts_link = "<a href=\"" . $artifacts_link . "\" style=\"color:blue;font-size:20px;\" target=\"_blank\">Go to Artifacts</a> ";
+ 		   $CLC_INFO->{"INPUT_FILE"} =  $artifacts_link .  "\n" .$CLC_INFO->{"INPUT_FILE"};
+ 		}
+ 		$CLC_INFO->{"INPUT_FILE"} = "##################### TEST SETUP #####################\n" . $CLC_INFO->{"INPUT_FILE"} . "\n\n\n##################### TEST OUTPUT #####################\n";
+ 		unshift(@running_log ,$CLC_INFO->{"INPUT_FILE"} );
+ 		### Remove \n and replace with HTML newline character <br>
  		foreach my $line (@running_log){
  			$line =~ s/\n/<br>/g;
- 		#	$line =~ s/\t//g;
- 		#	$html_result .= $line;
  		}
+ 		##
  		my $run_file = "run-$tc_id-" . time() .".log";
  		open FILE, ">", "$run_file" or die $!;
- 		print FILE "$notes\n@running_log";
+ 		print FILE"@running_log";
  		close FILE;
- 		my @scp_result = `scp $run_file root\@192.168.51.187:$run_file`;
- 		$self->sys("ssh root\@192.168.51.187 -o StrictHostKeyChecking=no \'./testlink/update_testcase.pl $run_file testcaseexternalid=$tc_id,testplanid=$tplan_id,status=$status,guess=true,platformid=$platform\'");
- 		$self->sys("ssh root\@192.168.51.187 -o StrictHostKeyChecking=no \'rm -f *.log\'"); 
- 	}
-	$self->sys("rm -f *.priv");
-    $self->sys("rm -rf $self->{CREDPATH}");
-    my @rm_log = `rm *.log`;
-	return 0;
+ 		my @scp_result = `scp $run_file root\@192.168.51.187:artifacts/$run_file`;
+ 		print "@scp_result";
+ 		
+ 		### IF a different testplan is in the memo update that one
+ 		if ( defined $CLC_INFO->{"TESTPLAN_ID"} ){
+ 			$tplan_id = $CLC_INFO->{"TESTPLAN_ID"};
+ 		}
+ 		$build = "other";
+ 		if ( defined $CLC_INFO->{'BZR_REVISION'}){
+ 			$build = $CLC_INFO->{'BZR_REVISION'};
+ 		}
+ 		my @build_response = $self->sys("ssh root\@192.168.51.187 -o StrictHostKeyChecking=no \'./testlink/update_build.pl testplanid=322 \"$build\"'");
+ 		my $build_id = $build_response[0];
+ 		chomp($build_id);
+ 		$self->sys("ssh root\@192.168.51.187 -o StrictHostKeyChecking=no \'./testlink/update_testcase.pl artifacts/$run_file testcaseexternalid=$tc_id,testplanid=$tplan_id,status=$status,buildid=$build_id,platformid=$platform\'");
+ 		$self->sys("ssh root\@192.168.51.187 -o StrictHostKeyChecking=no \'rm -f artifacts/*\'"); 
+ 		
+ 		print "Updated Testcase: $tc_id in Testplan $tplan_id with result $status on build $build_id which is revno $build\n";
+ 		return 0;
 }
+
 sub set_clc_info{
 	my $self = shift;
 	$CLC_INFO = shift;
@@ -351,16 +402,41 @@ sub read_input_file{
 	my $memo = "";
 	my %CLC;
 	open( INPUT, "< $filename" ) || die $!;
-
+ 
 	my $line;
 	while( $line = <INPUT> ){
+		$CLC{'INPUT_FILE'} .= $line;
 		chomp($line);
 		if( $is_memo ){
 			if( $line ne "END_MEMO" ){
+				
+				###LOOK FOR THE TESTPLAN_ID IN THE MEMO
+				if( $line =~ /^TESTPLAN_ID/){
+					my @testplan_id = split(/\s+/, $line);
+					$CLC{'TESTPLAN_ID'} = $testplan_id[1];
+				}
+				
+				### ADD THIS LINE TO THE MEMO
 				$memo .= $line . "\n";
 			};
-		};
-
+		} ;
+			if( $line =~ /^BZR_REVISION/){
+					my @bzr_rev = split(/\s+/, $line);
+					$CLC{'BZR_REVISION'} = $bzr_rev[1];
+				}
+			if( $line =~ /^TEST_NAME/){
+					my @test_name = split(/\s+/, $line);
+					$CLC{'TEST_NAME'} = $test_name[1];
+				}
+			if( $line =~ /^UNIQUE_ID/){
+					my @unique_id = split(/\s+/, $line);
+					$CLC{'UNIQUE_ID'} = $unique_id[1];
+				}
+			if( $line =~ /^NETWORK/){
+					my @network = split(/\s+/, $line);
+					$CLC{'NETWORK'} = $network[1];
+				}				
+				
         	if( $line =~ /^([\d\.]+)\t(.+)\t(.+)\t(\d+)\t(.+)\t\[(.+)\]/ ){
 			my $qa_ip = $1;
 			my $qa_distro = $2;
@@ -368,7 +444,7 @@ sub read_input_file{
 			my $qa_arch = $4;
 			my $qa_source = $5;
 			my $qa_roll = $6;
-
+			
 			my $this_roll = lc($6);
 			if( $this_roll =~ /clc/ ){
 				print "\n";
@@ -391,8 +467,8 @@ sub read_input_file{
 
 	$CLC{'QA_MEMO'} = $memo;
 	
-	
-
+	$CLC_INFO =\%CLC;
+ 
 	return \%CLC;
 };
 
@@ -724,17 +800,17 @@ sub upload_euca_image{
     chomp(@kernel);
 	chomp(@ramdisk);
 	chomp(@image);
-		
-	$self->sys("$self->{TOOLKIT}bundle-image -i $dir/$hypervisor-kernel/$kernel[0] --kernel true");
-	$self->sys("$self->{TOOLKIT}upload-bundle -b $prefix-kernel-bucket -m /tmp/$kernel[0].manifest.xml");
+	#$self->sys("mkdir bundle");	
+	$self->sys("$self->{TOOLKIT}bundle-image -i $dir/$hypervisor-kernel/$kernel[0] -d bundle --kernel true");
+	$self->sys("$self->{TOOLKIT}upload-bundle -b $prefix-kernel-bucket -m bundle/$kernel[0].manifest.xml");
 	my @eki_result = $self->sys("$self->{TOOLKIT}register $prefix-kernel-bucket/$kernel[0].manifest.xml");
 	if( $eki_result[0] !~ /eki/){
 		fail("Kernel not uploaded properly: $eki_result[0]");
 		return -1;
 	}
-		
-	$self->sys("$self->{TOOLKIT}bundle-image -i $dir/$hypervisor-kernel/$ramdisk[0] --ramdisk true");
-	$self->sys("$self->{TOOLKIT}upload-bundle -b $prefix-ramdisk-bucket -m /tmp/$ramdisk[0].manifest.xml");
+
+	$self->sys("$self->{TOOLKIT}bundle-image -i $dir/$hypervisor-kernel/$ramdisk[0] -d bundle --ramdisk true");
+	$self->sys("$self->{TOOLKIT}upload-bundle -b $prefix-ramdisk-bucket -m bundle/$ramdisk[0].manifest.xml");
 	my @eri_result = $self->sys("$self->{TOOLKIT}register $prefix-ramdisk-bucket/$ramdisk[0].manifest.xml");
 	if($eri_result[0] !~ /eri/){
 		fail("Ramdisk not uploaded properly");
@@ -746,11 +822,12 @@ sub upload_euca_image{
 	my @img = split(/\//, $dir); 
 	my $dircount = @img - 1;
 	my $imagename = $img[ $dircount ];
-	$self->sys("$self->{TOOLKIT}bundle-image -i $dir/$imagename.img --ramdisk $eri[1] --kernel $eki[1]");
-	$self->sys("$self->{TOOLKIT}upload-bundle -b $prefix-image-bucket -m /tmp/$imagename.img.manifest.xml");
+	$self->sys("$self->{TOOLKIT}bundle-image -i $dir/$imagename.img --ramdisk $eri[1] -d bundle --kernel $eki[1]");
+	$self->sys("$self->{TOOLKIT}upload-bundle -b $prefix-image-bucket -m bundle/$imagename.img.manifest.xml");
 	my @emi_result = $self->sys("$self->{TOOLKIT}register $prefix-image-bucket/$imagename.img.manifest.xml");
 	my @emi = split(/\s/, $emi_result[0]);
 	$self->set_timeout(120);
+	$self->sys("rm -rf bundle");	
 	if($emi_result[0] !~ /emi/){
 		fail("Image not uploaded properly");
 		return -1;
@@ -848,7 +925,7 @@ sub run_instance{
 #	my $keypath =$self->add_keypair($keypair);
 #	$self->add_group($group);
 	test_name("Sending run instance command");
-	my $base_command = "$self->{TOOLKIT}run-instances -k $keypair -g $group $emi";
+	my $base_command = "$self->{TOOLKIT}run-instances -g $group -k $keypair  $emi";
 	my @flags = ();
 	
 	my @output =  $self->sys($base_command);
@@ -1050,7 +1127,9 @@ sub delete_volume{
 	if( !$self->found("$self->{TOOLKIT}delete-volume $volume", qr/^VOLUME\s+$volume/) ){
 		fail("Failed to delete volume");
 		return -1;
-	}elsif( $self->found("$self->{TOOLKIT}describe-volumes", qr/^VOLUME\s+$volume.*available/ ) ){
+	}
+	sleep 5;
+	if( $self->found("$self->{TOOLKIT}describe-volumes", qr/^VOLUME\s+$volume.*available/ ) ){
 		fail("After delete volume still available");
 		return -1;
 	}else{
