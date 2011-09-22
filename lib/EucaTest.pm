@@ -266,7 +266,7 @@ sub update_testlink{
 			#[ID: 5 ] Ubuntu Lucid 32bit 		
 			#[ID: 7 ] RHEL 5 64bit 		
 			#[ID: 8 ] Debian Squeeze 64bit 		
-			if(  $CLC_INFO->{'NC_DISTRO'} =~ /VMWARE/i  ){
+			if(  $CLC_INFO->{'NODE_DISTRO'} =~ /VMWARE/i  ){
 				if( $qa_distro =~ /CENTOS/i ){
 					$platform = 12;
 				}elsif( $qa_distro =~ /UBUNTU/i ){
@@ -295,9 +295,7 @@ sub update_testlink{
 				$platform = 8;
 			}
 			
-			if(  $CLC_INFO->{'NC_DISTRO'} =~ /VMWARE/i  ){
-				
-			}
+			
 			
 			
  			#push(@running_log, "IP $qa_ip [Distro $qa_distro, Version $qa_distro_ver, ARCH $qa_arch] is built from $qa_source as Eucalyptus-$qa_roll\n");
