@@ -266,8 +266,14 @@ sub update_testlink{
 			#[ID: 5 ] Ubuntu Lucid 32bit 		
 			#[ID: 7 ] RHEL 5 64bit 		
 			#[ID: 8 ] Debian Squeeze 64bit 		
-			
-			if( ($qa_distro =~ /CENTOS/i) && ( $qa_arch =~ /64/)){
+			if(  $CLC_INFO->{'NC_DISTRO'} =~ /VMWARE/i  ){
+				if( $qa_distro =~ /CENTOS/i ){
+					$platform = 12;
+				}elsif( $qa_distro =~ /UBUNTU/i ){
+					$platform = 11;
+				}
+			}
+			elsif( ($qa_distro =~ /CENTOS/i) && ( $qa_arch =~ /64/)){
 				$platform = 1;
 			}
 			elsif( ($qa_distro =~ /CENTOS/i) && ( $qa_arch =~ /32/)){
@@ -289,6 +295,10 @@ sub update_testlink{
 				$platform = 8;
 			}
 			
+			if(  $CLC_INFO->{'NC_DISTRO'} =~ /VMWARE/i  ){
+				
+			}
+			
 			
  			#push(@running_log, "IP $qa_ip [Distro $qa_distro, Version $qa_distro_ver, ARCH $qa_arch] is built from $qa_source as Eucalyptus-$qa_roll\n");
  			
@@ -303,6 +313,9 @@ sub update_testlink{
  		unshift(@running_log ,$CLC_INFO->{"INPUT_FILE"} );
  		### Remove \n and replace with HTML newline character <br>
  		foreach my $line (@running_log){
+ 			if($line =~ /fail/i){
+				$line = "<font color=\"red\" size=\"5\">$line</font>";
+			}
  			$line =~ s/\n/<br>/g;
  		}
  		##
@@ -326,7 +339,7 @@ sub update_testlink{
  		chomp($build_id);
  		$self->sys("ssh root\@192.168.51.187 -o StrictHostKeyChecking=no \'./testlink/update_testcase.pl artifacts/$run_file testcaseexternalid=$tc_id,testplanid=$tplan_id,status=$status,buildid=$build_id,platformid=$platform\'");
  		$self->sys("ssh root\@192.168.51.187 -o StrictHostKeyChecking=no \'rm -f artifacts/*\'"); 
- 		
+ 		$self->sys("rm *.log");
  		print "Updated Testcase: $tc_id in Testplan $tplan_id with result $status on build $build_id which is revno $build\n";
  		return 0;
 }
@@ -400,20 +413,20 @@ sub read_input_file{
 	my $filename = shift;
 	my $is_memo = 0;
 	my $memo = "";
-	my %CLC;
+	my %CONFIG;
 	open( INPUT, "< $filename" ) || die $!;
  
 	my $line;
 	while( $line = <INPUT> ){
-		$CLC{'INPUT_FILE'} .= $line;
+		$CONFIG{'INPUT_FILE'} .= $line;
 		chomp($line);
 		if( $is_memo ){
 			if( $line ne "END_MEMO" ){
 				
 				###LOOK FOR THE TESTPLAN_ID IN THE MEMO
 				if( $line =~ /^TESTPLAN_ID/){
-					my @testplan_id = split(/\s+/, $line);
-					$CLC{'TESTPLAN_ID'} = $testplan_id[1];
+					my @testplan_id = split(/=/, $line);
+					$CONFIG{'TESTPLAN_ID'} = $testplan_id[1];
 				}
 				
 				### ADD THIS LINE TO THE MEMO
@@ -422,19 +435,19 @@ sub read_input_file{
 		} ;
 			if( $line =~ /^BZR_REVISION/){
 					my @bzr_rev = split(/\s+/, $line);
-					$CLC{'BZR_REVISION'} = $bzr_rev[1];
+					$CONFIG{'BZR_REVISION'} = $bzr_rev[1];
 				}
 			if( $line =~ /^TEST_NAME/){
 					my @test_name = split(/\s+/, $line);
-					$CLC{'TEST_NAME'} = $test_name[1];
+					$CONFIG{'TEST_NAME'} = $test_name[1];
 				}
 			if( $line =~ /^UNIQUE_ID/){
 					my @unique_id = split(/\s+/, $line);
-					$CLC{'UNIQUE_ID'} = $unique_id[1];
+					$CONFIG{'UNIQUE_ID'} = $unique_id[1];
 				}
 			if( $line =~ /^NETWORK/){
 					my @network = split(/\s+/, $line);
-					$CLC{'NETWORK'} = $network[1];
+					$CONFIG{'NETWORK'} = $network[1];
 				}				
 				
         	if( $line =~ /^([\d\.]+)\t(.+)\t(.+)\t(\d+)\t(.+)\t\[(.+)\]/ ){
@@ -448,14 +461,20 @@ sub read_input_file{
 			my $this_roll = lc($6);
 			if( $this_roll =~ /clc/ ){
 				print "\n";
-				print "IP $qa_ip [Distro $qa_distro, Version $qa_distro_ver, ARCH $qa_arch] is built from $qa_source as Eucalyptus-$qa_roll\n";
-				$CLC{'QA_DISTRO'} = $qa_distro;
-				$CLC{'QA_DISTRO_VER'} = $qa_distro_ver;
-				$CLC{'QA_ARCH'} = $qa_arch;
-				$CLC{'QA_SOURCE'} = $qa_source;
-				$CLC{'QA_ROLL'} = $qa_roll;
-				$CLC{'QA_IP'} = $qa_ip;
-			};
+				$CONFIG{'QA_DISTRO'} = $qa_distro;
+				$CONFIG{'QA_DISTRO_VER'} = $qa_distro_ver;
+				$CONFIG{'QA_ARCH'} = $qa_arch;
+				$CONFIG{'QA_SOURCE'} = $qa_source;
+				$CONFIG{'QA_ROLL'} = $qa_roll;
+				$CONFIG{'QA_IP'} = $qa_ip;
+					print "IP $qa_ip [CLC Distro: $qa_distro CLC Version: $qa_distro_ver CLC ARCH $qa_arch] is built from $qa_source as Eucalyptus-$qa_roll\n";
+			}elsif( $this_roll =~ /nc/ ){
+				
+				$CONFIG{'NODE_DISTRO'} = $qa_distro;
+				$CONFIG{'NODE_DISTRO_VER'} = $qa_distro_ver;
+					print "IP $qa_ip [NC Distro: $qa_distro NC Version: $qa_distro_ver NC ARCH $qa_arch] is built from $qa_source as Eucalyptus-$qa_roll\n";
+			}
+		
 		}elsif( $line =~ /^MEMO/ ){
 			$is_memo = 1;
 		}elsif( $line =~ /^END_MEMO/ ){
@@ -465,11 +484,11 @@ sub read_input_file{
 
 	close(INPUT);
 
-	$CLC{'QA_MEMO'} = $memo;
+	$CONFIG{'QA_MEMO'} = $memo;
 	
-	$CLC_INFO =\%CLC;
+	$CLC_INFO =\%CONFIG;
  
-	return \%CLC;
+	return \%CONFIG;
 };
 
 sub piperun {
