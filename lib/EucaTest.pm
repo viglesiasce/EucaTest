@@ -47,12 +47,12 @@ sub new{
 		## are we authenticating with keys or with password alone
 		if( defined $keypath){
 			chomp $keypath;
-			 test_name("Creating a keypair authenticated SSH connection to $host\n");
+			 test_name("Creating a keypair authenticated SSH connection to $host");
 			$ssh =  Net::OpenSSH->new( $host, key_path => $keypath ,  master_opts => [-o => "StrictHostKeyChecking=no" ]  );
 			$ssh->error and
    			fail( $ssh->error);
 		}else{
-			test_name( "Creating a password authenticated SSH connection to $host\n");
+			test_name( "Creating a password authenticated SSH connection to $host");
 			$ssh =  Net::OpenSSH->new($host,  master_opts => [-o => "StrictHostKeyChecking=no" ] );
 			$ssh->error and
    			fail( $ssh->error);
@@ -219,6 +219,16 @@ sub set_credpath{
 	return 0;
 }
 
+sub download_keypair{
+	my $self = shift;
+	my $keypair = shift;
+	my @rsa_pub = `cat ~/.ssh/id_rsa.pub`;
+	$self->sys("echo \'@rsa_pub\' >> ~/.ssh/authorized_keys");
+	my $cmd = "scp root\@$CLC_INFO->{'QA_IP'}:$keypair.priv .";
+	my $keypair_text = `$cmd`;
+	return $keypair_text;
+	
+}
 sub cleanup{
 	my $self = shift;
  	my $tc_id = shift;
@@ -267,7 +277,10 @@ sub update_testlink{
 			#[ID: 4 ] Ubuntu Lucid 64bit 				
 			#[ID: 5 ] Ubuntu Lucid 32bit 		
 			#[ID: 7 ] RHEL 5 64bit 		
-			#[ID: 8 ] Debian Squeeze 64bit 		
+			#[ID: 8 ] Debian Squeeze 64bit 	
+			if( !defined $CLC_INFO->{'NODE_DISTRO'}  ){
+				$CLC_INFO->{'NODE_DISTRO'} = "unknown";
+			}	
 			if(  $CLC_INFO->{'NODE_DISTRO'} =~ /VMWARE/i  ){
 				if( $qa_distro =~ /CENTOS/i ){
 					$platform = 12;
@@ -310,17 +323,18 @@ sub update_testlink{
  		   $CLC_INFO->{"INPUT_FILE"} =  $artifacts_link .  "\n" .$CLC_INFO->{"INPUT_FILE"};
  		}
  		$CLC_INFO->{"INPUT_FILE"} = "##################### TEST SETUP #####################\n" . $CLC_INFO->{"INPUT_FILE"} . "\n\n\n##################### TEST OUTPUT #####################\n";
- 		unshift(@running_log ,$CLC_INFO->{"INPUT_FILE"} );
+ 		
  		### Remove \n and replace with HTML newline character <br>
  		foreach my $line (@running_log){
  			if($line =~ /fail/i){
 				$line = "<font color=\"red\" size=\"4\">$line</font>";
 			}elsif( $line =~ /\[.*].*/ ){
-				$line = "<font color=\"green\" size=\"2\">$line</font>";
+				$line = "<font color=\"blue\" size=\"2\">$line</font>";
 			}
 			
  			$line =~ s/\n/<br>/g;
  		}
+ 		unshift(@running_log ,$CLC_INFO->{"INPUT_FILE"} );
  		##
  		my $run_file = "run-$tc_id-" . time() .".log";
  		open FILE, ">", "$run_file" or die $!;
@@ -385,17 +399,15 @@ sub sys {
        my $timestamp =  timestamp();
   		
 	if( defined  $self->{SSH} ){
-		
-		 print("[REMOTE - $timestamp] $original_cmd\n");
-		  # 
-		 push(@running_log, "[REMOTE - $timestamp] $original_cmd\n");
+		 my $rem_host = $self->{SSH}->get_host();
+		 my $rem_user = $self->{SSH}->get_user();
+		 $self->log("[$rem_user\@$rem_host - $timestamp] $original_cmd\n");
 		  @output =  $self->{SSH}->capture( $cmd);
 		 
  		  #$self->{SSH}->error and fail( "SSH ERROR: " . $self->{SSH}->error);
 		 
 	}else{
-		print("[LOCAL - $timestamp] $original_cmd\n");
-		push(@running_log, "[LOCAL - $timestamp] $original_cmd\n");
+		$self->log(@running_log, "[LOCAL - $timestamp] $original_cmd\n");
 		@output = `$cmd`;
 		
 	}
