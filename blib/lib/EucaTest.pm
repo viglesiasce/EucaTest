@@ -6,7 +6,7 @@ use warnings;
 
 use Net::OpenSSH;
 require Exporter;
-
+#use Data::Dumper;
 
 
 our @ISA = qw(Exporter);
@@ -14,11 +14,10 @@ our @ISA = qw(Exporter);
 # Items to export into callers namespace by default. Note: do not export
 # names by default without a very good reason. Use EXPORT_OK instead.
 # Do not simply export all your public functions/methods/constants.
-
 # This allows declaration	use EucaTest ':all';
 # If you do not need this, moving things directly into @EXPORT or @EXPORT_OK
 # will save memory.
-our %EXPORT_TAGS = ( 'all' => [ qw(
+our %EXPORT_TAGS = ( 'all' => [ qw( test_name fail pass
 	
 ) ] );
 
@@ -29,8 +28,12 @@ our @EXPORT = qw(
 );
 
 our $VERSION = '0.01';
-
-
+my $exit_on_fail = 0;
+my $fail_count = 0;
+our $ofile = "ubero";
+my $CLC_INFO = {};
+my @running_log;
+open(STDERR, ">&STDOUT");
 sub new{
 	my $ssh;
 	my $class = shift;
@@ -42,10 +45,12 @@ sub new{
 		print "Creating an SSH connection to $host\n";
 		## are we authenticating with keys or with password alone
 		if( defined $keypath){
+			 test_name("Creating a keypair authenticated SSH connection to $host\n");
 			$ssh =  Net::OpenSSH->new( $host, key_path => $keypath ,  master_opts => [-o => "StrictHostKeyChecking=no" ]  );
 			$ssh->error and
    			fail( $ssh->error);
 		}else{
+			test_name( "Creating a password authenticated SSH connection to $host\n");
 			$ssh =  Net::OpenSSH->new($host,  master_opts => [-o => "StrictHostKeyChecking=no" ] );
 			$ssh->error and
    			fail( $ssh->error);
@@ -58,6 +63,10 @@ sub new{
 	my $credpath = $opts->{'credpath'};
 	if( !defined $credpath){
 		 $credpath = "";
+	}
+	my $delay = $opts->{'delay'};
+	if( !defined $delay){
+		 $delay = 0;
 	}
 	
 	my $timeout = $opts->{'timeout'};
@@ -79,21 +88,41 @@ sub new{
 	if( !defined $toolkit){
 		$toolkit = "euca-";
 	}
-	
-	my $self  = { SSH => $ssh , CREDPATH => $credpath, TIMEOUT => $timeout, EUCALYPTUS => $eucadir,  VERIFYLEVEL=> $verify_level, TOOLKIT => $toolkit};
+	$exit_on_fail = $opts->{'exit_on_fail'};	
+	if( !defined $exit_on_fail){
+		$exit_on_fail = 0;
+	}
+	my $self  = { SSH => $ssh , CREDPATH => $credpath, TIMEOUT => $timeout, EUCALYPTUS => $eucadir,  VERIFY_LEVEL=> $verify_level, TOOLKIT => $toolkit, DELAY => $delay, EXIT_ON_FAIL => $exit_on_fail, FAIL_COUNT=> $fail_count};
 	bless $self;
+	
+	if( defined $ssh && $self->get_credpath eq ""){
+		my $admin_credpath = $self->get_cred("eucalyptus", "admin");
+		
+		if($admin_credpath !~ /eucarc/ ){
+			fail("Failed to download credentials");
+		}else{
+			$self->set_credpath($admin_credpath);
+		}
+	}
+	
 	return $self;
 }
 
 sub fail {
   my($message) = @_;
+  
+  push(@running_log, "^^^^^^[TEST_REPORT] FAILED - $message^^^^^^\n");
   print("^^^^^^[TEST_REPORT] FAILED - $message^^^^^^\n");
-  #exit(1);
+  $fail_count++;
+  if ($exit_on_fail){
+  	exit(1);
+  }
 }
 
 # Print formatted success message
 sub pass {
   my($message) = @_;
+  push(@running_log, "^^^^^^[TEST_REPORT] PASSED - $message^^^^^^\n\n");
   print("^^^^^^[TEST_REPORT] PASSED - $message^^^^^^\n\n");
   return 0;
 }
@@ -101,9 +130,23 @@ sub pass {
 # Print test case name (ie a description of the following steps)
 sub test_name {
   my($name) = @_;
+  push(@running_log, "******[TEST_REPORT] ACTION - $name ******\n");
   print("******[TEST_REPORT] ACTION - $name ******\n");
 }
 
+sub log{
+	my $self =shift;
+	my $message = shift;
+	push(@running_log, "$message\n");
+	print($message);
+	return 0;
+}
+
+
+sub get_fail_count{
+	my $self = shift;
+	return $fail_count;
+}
 sub get_verifylevel{
 	my $self = shift;
 	return $self->{VERIFYLEVEL};
@@ -112,6 +155,16 @@ sub set_verifylevel{
 	my $self = shift;
 	my $level = shift;
 	$self->{VERIFYLEVEL}= $level;
+	return 0;
+}
+sub get_delay{
+	my $self = shift;
+	return $self->{DELAY};
+}
+sub set_delay{
+	my $self = shift;
+	my $delay = shift;
+	$self->{DELAY}= $delay;
 	return 0;
 }
 sub get_toolkit{
@@ -156,8 +209,149 @@ sub get_credpath{
 sub set_credpath{
 	my $self = shift;
 	my $credpath = shift;
+	$self->sys("cat $credpath/eucarc  | grep -v EUCA_KEY_DIR= > $credpath/eucarc.tmp");
+    $self->sys("echo EUCA_KEY_DIR=$credpath > $credpath/eucarc.dir; cat $credpath/eucarc.tmp >> $credpath/eucarc.dir; mv $credpath/eucarc.dir $credpath/eucarc");
+	
 	$self->{CREDPATH} = $credpath;
+
 	return 0;
+}
+
+sub cleanup{
+	my $self = shift;
+ 	my $tc_id = shift;
+ 	my $tplan_id = shift;
+ 	if( defined $tc_id && defined $tplan_id){
+ 		
+ 		$self->update_testlink($tc_id, $tplan_id);
+ 	}
+	$self->sys("rm -f *.priv *.log");
+    $self->sys("rm -rf $self->{CREDPATH}");
+    my @rm_log = `rm *.log`;
+	return 0;
+}
+
+
+sub update_testlink{
+	my $self =shift;
+	my $tc_id = shift;
+	my $tplan_id = shift;
+	my $status = shift;
+	my $build = shift;
+	
+	### Get status from total fail_count
+	if( !defined $status){
+		$status = 'f';
+		if( $fail_count == 0){
+ 			$status= "p";
+ 		}
+	}
+	 
+ 		
+ 		my $notes ="";
+ 		my $platform = 1;
+ 		
+ 		if( defined $CLC_INFO->{"QA_DISTRO"}) {
+ 			    my $qa_distro =  $CLC_INFO->{"QA_DISTRO"};
+				my $qa_distro_ver = $CLC_INFO->{'QA_DISTRO_VER'} ;
+				my $qa_arch = $CLC_INFO->{'QA_ARCH'};
+				my $qa_source = $CLC_INFO->{'QA_SOURCE'} ;
+				my $qa_roll =$CLC_INFO->{'QA_ROLL'} ;
+				my $qa_ip =$CLC_INFO->{'QA_IP'} ;
+				
+			#[ID: 1 ] CentOS 5 64bit 		
+			#[ID: 2 ] CentOS 5 32bit 		
+			#[ID: 3 ] RHEL 5 32bit 		
+			#[ID: 4 ] Ubuntu Lucid 64bit 				
+			#[ID: 5 ] Ubuntu Lucid 32bit 		
+			#[ID: 7 ] RHEL 5 64bit 		
+			#[ID: 8 ] Debian Squeeze 64bit 		
+			if(  $CLC_INFO->{'NODE_DISTRO'} =~ /VMWARE/i  ){
+				if( $qa_distro =~ /CENTOS/i ){
+					$platform = 12;
+				}elsif( $qa_distro =~ /UBUNTU/i ){
+					$platform = 11;
+				}
+			}
+			elsif( ($qa_distro =~ /CENTOS/i) && ( $qa_arch =~ /64/)){
+				$platform = 1;
+			}
+			elsif( ($qa_distro =~ /CENTOS/i) && ( $qa_arch =~ /32/)){
+				$platform = 2;
+			}
+			elsif( ($qa_distro =~ /RHEL/i) && ( $qa_arch =~ /64/)){
+				$platform = 7;
+			}
+			elsif( ($qa_distro =~ /RHEL/i) && ( $qa_arch =~ /32/)){
+				$platform = 3;
+			}
+			elsif( ($qa_distro =~ /UBUNTU/i) && ( $qa_arch =~ /64/)){
+				$platform = 4;
+			}
+			elsif( ($qa_distro =~ /UBUNTU/i) && ( $qa_arch =~ /32/)){
+				$platform = 5;
+			}
+			elsif( ($qa_distro_ver =~ /DEBIAN/i) && ( $qa_arch =~ /64/)){
+				$platform = 8;
+			}
+			
+			
+			
+			
+ 			#push(@running_log, "IP $qa_ip [Distro $qa_distro, Version $qa_distro_ver, ARCH $qa_arch] is built from $qa_source as Eucalyptus-$qa_roll\n");
+ 			
+ 		}
+ 		### Add the entire config file to the top of the result
+ 		if( defined $CLC_INFO->{"TEST_NAME"}){
+ 			my $artifacts_link = "http://10.1.1.210/test_space/". $CLC_INFO->{"TEST_NAME"} . "/" . $CLC_INFO->{"UNIQUE_ID"} ;
+ 			$artifacts_link = "<a href=\"" . $artifacts_link . "\" style=\"color:blue;font-size:20px;\" target=\"_blank\">Go to Artifacts</a> ";
+ 		   $CLC_INFO->{"INPUT_FILE"} =  $artifacts_link .  "\n" .$CLC_INFO->{"INPUT_FILE"};
+ 		}
+ 		$CLC_INFO->{"INPUT_FILE"} = "##################### TEST SETUP #####################\n" . $CLC_INFO->{"INPUT_FILE"} . "\n\n\n##################### TEST OUTPUT #####################\n";
+ 		unshift(@running_log ,$CLC_INFO->{"INPUT_FILE"} );
+ 		### Remove \n and replace with HTML newline character <br>
+ 		foreach my $line (@running_log){
+ 			if($line =~ /fail/i){
+				$line = "<font color=\"red\" size=\"5\">$line</font>";
+			}
+ 			$line =~ s/\n/<br>/g;
+ 		}
+ 		##
+ 		my $run_file = "run-$tc_id-" . time() .".log";
+ 		open FILE, ">", "$run_file" or die $!;
+ 		print FILE"@running_log";
+ 		close FILE;
+ 		my @scp_result = `scp $run_file root\@192.168.51.187:artifacts/$run_file`;
+ 		print "@scp_result";
+ 		
+ 		### IF a different testplan is in the memo update that one
+ 		if ( defined $CLC_INFO->{"TESTPLAN_ID"} ){
+ 			$tplan_id = $CLC_INFO->{"TESTPLAN_ID"};
+ 		}
+ 		$build = "other";
+ 		if ( defined $CLC_INFO->{'BZR_REVISION'}){
+ 			$build = $CLC_INFO->{'BZR_REVISION'};
+ 		}
+ 		my @build_response = $self->sys("ssh root\@192.168.51.187 -o StrictHostKeyChecking=no \'./testlink/update_build.pl testplanid=322 \"$build\"'");
+ 		my $build_id = $build_response[0];
+ 		chomp($build_id);
+ 		$self->sys("ssh root\@192.168.51.187 -o StrictHostKeyChecking=no \'./testlink/update_testcase.pl artifacts/$run_file testcaseexternalid=$tc_id,testplanid=$tplan_id,status=$status,buildid=$build_id,platformid=$platform\'");
+ 		$self->sys("ssh root\@192.168.51.187 -o StrictHostKeyChecking=no \'rm -f artifacts/*\'"); 
+ 		$self->sys("rm *.log");
+ 		print "Updated Testcase: $tc_id in Testplan $tplan_id with result $status on build $build_id which is revno $build\n";
+ 		return 0;
+}
+
+sub set_clc_info{
+	my $self = shift;
+	$CLC_INFO = shift;
+	return 0;	
+}
+sub timestamp{
+	 my ($sec,$min,$hour,$mday,$mon,$year,$wday,$yday,$isdst)=localtime(time);
+     my $timestamp =  sprintf ("%02d-%02d %02d:%02d:%02d\n",$mon+1,$mday,$hour,$min,$sec);
+	chomp($timestamp);
+	return $timestamp;  
 }
 
 sub sys {
@@ -168,6 +362,8 @@ sub sys {
   if( $self->{CREDPATH} ne ""){
 		$cmd = ". " . $self->{CREDPATH} ."/eucarc && " . $cmd;
   }
+
+  sleep($self->{DELAY});
   my $systimeout;
   if(defined $timeout){
   	$systimeout = $timeout;
@@ -180,19 +376,23 @@ sub sys {
   	$SIG{ALRM} = sub { die "alarm\n"; };
 	eval {		
     alarm($systimeout);
-    
+      
+       my $timestamp =  timestamp();
+  		
 	if( defined  $self->{SSH} ){
 		
-		 print("[REMOTE COMMAND] $original_cmd\n");
-		 # 
-	
+		 print("[REMOTE - $timestamp] $original_cmd\n");
+		  # 
+		 push(@running_log, "[REMOTE $timestamp] $original_cmd\n");
 		  @output =  $self->{SSH}->capture( $cmd);
+		 
  		  #$self->{SSH}->error and fail( "SSH ERROR: " . $self->{SSH}->error);
 		 
 	}else{
-		print("[LOCAL COMMAND] $original_cmd\n");
-		
+		print("[LOCAL - $timestamp] $original_cmd\n");
+		push(@running_log, "[LOCAL $timestamp] $original_cmd\n");
 		@output = `$cmd`;
+		
 	}
 	alarm(0);
 		
@@ -200,11 +400,15 @@ sub sys {
 	if ($@) {
 		die unless $@ eq "alarm\n"; # propagate unexpected errors
 		# timed out
+		push(@running_log,  @output);
+		print  "@output\n"; 
 		fail("Timeout occured after $systimeout seconds\n"); 
+		
 		return @output;
 	}
 	else {		# didn't
-		print "OUTPUT:\n" . "@output\n";
+		print  "@output\n";
+		push(@running_log, @output);
 		return @output;
     
 	}
@@ -216,18 +420,43 @@ sub read_input_file{
 	my $filename = shift;
 	my $is_memo = 0;
 	my $memo = "";
-	my %CLC;
+	my %CONFIG;
 	open( INPUT, "< $filename" ) || die $!;
-
+ 
 	my $line;
 	while( $line = <INPUT> ){
+		$CONFIG{'INPUT_FILE'} .= $line;
 		chomp($line);
 		if( $is_memo ){
 			if( $line ne "END_MEMO" ){
+				
+				###LOOK FOR THE TESTPLAN_ID IN THE MEMO
+				if( $line =~ /^TESTPLAN_ID/){
+					my @testplan_id = split(/=/, $line);
+					$CONFIG{'TESTPLAN_ID'} = $testplan_id[1];
+				}
+				
+				### ADD THIS LINE TO THE MEMO
 				$memo .= $line . "\n";
 			};
-		};
-
+		} ;
+			if( $line =~ /^BZR_REVISION/){
+					my @bzr_rev = split(/\s+/, $line);
+					$CONFIG{'BZR_REVISION'} = $bzr_rev[1];
+				}
+			if( $line =~ /^TEST_NAME/){
+					my @test_name = split(/\s+/, $line);
+					$CONFIG{'TEST_NAME'} = $test_name[1];
+				}
+			if( $line =~ /^UNIQUE_ID/){
+					my @unique_id = split(/\s+/, $line);
+					$CONFIG{'UNIQUE_ID'} = $unique_id[1];
+				}
+			if( $line =~ /^NETWORK/){
+					my @network = split(/\s+/, $line);
+					$CONFIG{'NETWORK'} = $network[1];
+				}				
+				
         	if( $line =~ /^([\d\.]+)\t(.+)\t(.+)\t(\d+)\t(.+)\t\[(.+)\]/ ){
 			my $qa_ip = $1;
 			my $qa_distro = $2;
@@ -235,18 +464,24 @@ sub read_input_file{
 			my $qa_arch = $4;
 			my $qa_source = $5;
 			my $qa_roll = $6;
-
+			
 			my $this_roll = lc($6);
 			if( $this_roll =~ /clc/ ){
 				print "\n";
-				print "IP $qa_ip [Distro $qa_distro, Version $qa_distro_ver, ARCH $qa_arch] is built from $qa_source as Eucalyptus-$qa_roll\n";
-				$CLC{'QA_DISTRO'} = $qa_distro;
-				$CLC{'QA_DISTRO_VER'} = $qa_distro_ver;
-				$CLC{'QA_ARCH'} = $qa_arch;
-				$CLC{'QA_SOURCE'} = $qa_source;
-				$CLC{'QA_ROLL'} = $qa_roll;
-				$CLC{'QA_IP'} = $qa_ip;
-			};
+				$CONFIG{'QA_DISTRO'} = $qa_distro;
+				$CONFIG{'QA_DISTRO_VER'} = $qa_distro_ver;
+				$CONFIG{'QA_ARCH'} = $qa_arch;
+				$CONFIG{'QA_SOURCE'} = $qa_source;
+				$CONFIG{'QA_ROLL'} = $qa_roll;
+				$CONFIG{'QA_IP'} = $qa_ip;
+					print "IP $qa_ip [CLC Distro: $qa_distro CLC Version: $qa_distro_ver CLC ARCH $qa_arch] is built from $qa_source as Eucalyptus-$qa_roll\n";
+			}elsif( $this_roll =~ /nc/ ){
+				
+				$CONFIG{'NODE_DISTRO'} = $qa_distro;
+				$CONFIG{'NODE_DISTRO_VER'} = $qa_distro_ver;
+					print "IP $qa_ip [NC Distro: $qa_distro NC Version: $qa_distro_ver NC ARCH $qa_arch] is built from $qa_source as Eucalyptus-$qa_roll\n";
+			}
+		
 		}elsif( $line =~ /^MEMO/ ){
 			$is_memo = 1;
 		}elsif( $line =~ /^END_MEMO/ ){
@@ -256,10 +491,39 @@ sub read_input_file{
 
 	close(INPUT);
 
-	$CLC{'QA_MEMO'} = $memo;
-
-	return %CLC;
+	$CONFIG{'QA_MEMO'} = $memo;
+	
+	$CLC_INFO =\%CONFIG;
+ 
+	return \%CONFIG;
 };
+
+sub piperun {
+	my $self = shift;
+    my $cmd = shift @_;
+    my $pipe = shift @_;
+    my $uberofile = shift @_ || "/tmp/uberofile.$$";
+    my $pipestr = "";
+
+    if ($pipe) {
+	$pipestr = "| $pipe";
+    }
+    
+    my @buf = $self->sys("$cmd > /tmp/tout.$$ 2>&1");
+    my $retcode = ${^CHILD_ERROR_NATIVE};
+
+    chomp(my $buf = `cat /tmp/tout.$$ $pipestr`);
+    my $pipecode = system("cat /tmp/tout.$$ $pipestr >/dev/null 2>&1");
+
+    system("echo '*****' >> $uberofile");
+    system("echo CMD=$cmd >> $uberofile");
+    my $rc = system("cat /tmp/tout.$$ >> $uberofile");
+    unlink("/tmp/tout.$$");
+
+    sleep(1);
+    return($retcode, $pipecode, $buf);
+}
+
 
 sub get_cred {
   my($self, $account, $user) = @_;
@@ -292,6 +556,13 @@ sub download_cred{
 	print $create_dir;
 	$self->{SSH}->scp_get({glob => 1}, $self->{CREDPATH} . "/*", "$self->{CREDPATH}");
 	return $self->{CREDPATH};
+}
+
+sub send_cred{
+	my $self = shift;
+	my $host = shift;
+	$self->sys("scp -r $self->{CREDPATH} $host");
+	return $self->{CREDPATH};	
 }
 
 sub add_keypair{
@@ -353,6 +624,14 @@ sub delete_keypair{
 	}
 }
 
+sub get_keypair{
+	my $self = shift;
+	my $keyname = shift;
+	my $filepath = "$keyname.priv";
+	my @key = $self->sys("cat $filepath");
+	return "@key";
+}
+
 sub found {
   my($self, $list_cmd, $to_search) = @_;
   my $found = 0;
@@ -367,34 +646,61 @@ sub found {
 sub add_group{
 	my $self = shift;
 	my $groupname = shift;
-	my $ip = shift;
-	my @add_group = $self->sys("$self->{TOOLKIT}add-group $groupname -d $groupname");
-	if($add_group[0] =~ /GROUP/){
-		pass("Added group $groupname successfully");
-	}
-	else{ 
-		fail("Unable to add group $groupname");
-		return -1;
+	my $rule = shift;
+	
+	
+	
+	### CHECK IF THE GROUP EXISTS
+	my @desc_groups = $self->sys("$self->{TOOLKIT}describe-groups $groupname");
+	
+	### IF IT DOES NOT EXIST CREATE IT 
+	if( @desc_groups < 1){
+		my @add_group = $self->sys("$self->{TOOLKIT}add-group $groupname -d $groupname");
+		if($add_group[0] =~ /GROUP/){
+			pass("Added group $groupname successfully");
+		}
+		else{ 
+			fail("Unable to add group $groupname");
+			return -1;
+		}
+	}else{
+		pass("Group $groupname already exists not creating");
 	}
 	
-	my @auth_icmp = $self->sys("$self->{TOOLKIT}authorize $groupname -P icmp");
-	if($auth_icmp[0] =~ /GROUP/){
-		pass("Added ICMP authorization for $groupname successfully");
-	}
-	else{ 
-		fail("Unable authorize group $groupname for ICMP");
-		return -1;
+	
+	
+	### IF THE USER DOES NOT PROVIDE A RULE CREATE THE GROUP with p22 and icmp
+	if( !defined $rule ){
+		
+		my @auth_icmp = $self->sys("$self->{TOOLKIT}authorize $groupname -P icmp");
+		if($auth_icmp[0] =~ /GROUP/){
+			pass("Added ICMP authorization for $groupname successfully");
+		}
+		else{ 
+			fail("Unable authorize group $groupname for ICMP");
+			return -1;
+		}
+		
+		my @auth_ssh  = $self->sys("$self->{TOOLKIT}authorize $groupname -p 22");
+		if($auth_ssh[0] =~ /GROUP/){
+			pass("Added SSH authorization for $groupname successfully");
+		}
+		else{ 
+			fail("Unable authorize group $groupname for SSH");
+			return -1;
+		}
+	}else{
+		my @auth_rule = $self->sys("$self->{TOOLKIT}authorize $groupname $rule");
+		if($auth_rule[0] =~ /GROUP/){
+			pass("Added $rule authorization for $groupname successfully");
+		}
+		else{ 
+			fail("Unable authorize group $groupname for $rule");
+			return -1;
+		}
 	}
 	
-	my @auth_ssh  = $self->sys("$self->{TOOLKIT}authorize $groupname -p 22");
-	if($auth_ssh[0] =~ /GROUP/){
-		pass("Added SSH authorization for $groupname successfully");
-	}
-	else{ 
-		fail("Unable authorize group $groupname for SSH");
-		return -1;
-	}
-	return (@add_group, @auth_icmp, @auth_ssh);
+	return ($groupname);
 }
 
 
@@ -458,6 +764,10 @@ sub get_emi{
 		$cmd .= " | grep $filter";
 	}
 	my @output = $self->sys($cmd);
+	if( @output < 1){
+		fail("No EMI found");
+		return -1;
+	}
 	if($output[0] =~ /emi/){
 		my @emi = split(' ', $output[0] );
 		pass("Found EMI $emi[1]");
@@ -468,6 +778,29 @@ sub get_emi{
 		return -1;
 	}
 	
+}
+
+sub discover_emis {
+    my $self = shift;
+   
+    my $cmd = "$self->{TOOLKIT}describe-images";
+    my ($crc, $rc, $buf) = piperun($cmd, "grep IMAGE | grep -i 'mi-' | awk '{print \$2}'", "$ofile");
+    if ($rc) {
+		fail("Failed in running describe images when trying to discover EMIs");
+		return -1;
+    }
+    my @emi_list= ();
+    my @output = split(/\s+/, $buf);
+    foreach my $emi (@output) {
+		if (!$emi  || $emi eq "" || !($emi =~ /.*mi-.*/)) {
+	    	print "WARN: emis=@output, emi=$emi\n";
+		} 
+		else {
+	    	push(@emi_list, $emi);
+		}
+    }
+
+    return @emi_list;
 }
 
 ### TAKES in the url to a euca packaged image
@@ -520,17 +853,17 @@ sub upload_euca_image{
     chomp(@kernel);
 	chomp(@ramdisk);
 	chomp(@image);
-		
-	$self->sys("$self->{TOOLKIT}bundle-image -i $dir/$hypervisor-kernel/$kernel[0] --kernel true");
-	$self->sys("$self->{TOOLKIT}upload-bundle -b $prefix-kernel-bucket -m /tmp/$kernel[0].manifest.xml");
+	#$self->sys("mkdir bundle");	
+	$self->sys("$self->{TOOLKIT}bundle-image -i $dir/$hypervisor-kernel/$kernel[0] -d bundle --kernel true");
+	$self->sys("$self->{TOOLKIT}upload-bundle -b $prefix-kernel-bucket -m bundle/$kernel[0].manifest.xml");
 	my @eki_result = $self->sys("$self->{TOOLKIT}register $prefix-kernel-bucket/$kernel[0].manifest.xml");
 	if( $eki_result[0] !~ /eki/){
 		fail("Kernel not uploaded properly: $eki_result[0]");
 		return -1;
 	}
-		
-	$self->sys("$self->{TOOLKIT}bundle-image -i $dir/$hypervisor-kernel/$ramdisk[0] --ramdisk true");
-	$self->sys("$self->{TOOLKIT}upload-bundle -b $prefix-ramdisk-bucket -m /tmp/$ramdisk[0].manifest.xml");
+
+	$self->sys("$self->{TOOLKIT}bundle-image -i $dir/$hypervisor-kernel/$ramdisk[0] -d bundle --ramdisk true");
+	$self->sys("$self->{TOOLKIT}upload-bundle -b $prefix-ramdisk-bucket -m bundle/$ramdisk[0].manifest.xml");
 	my @eri_result = $self->sys("$self->{TOOLKIT}register $prefix-ramdisk-bucket/$ramdisk[0].manifest.xml");
 	if($eri_result[0] !~ /eri/){
 		fail("Ramdisk not uploaded properly");
@@ -542,18 +875,87 @@ sub upload_euca_image{
 	my @img = split(/\//, $dir); 
 	my $dircount = @img - 1;
 	my $imagename = $img[ $dircount ];
-	$self->sys("$self->{TOOLKIT}bundle-image -i $dir/$imagename.img --ramdisk $eri[1] --kernel $eki[1]");
-	$self->sys("$self->{TOOLKIT}upload-bundle -b $prefix-image-bucket -m /tmp/$imagename.img.manifest.xml");
+	$self->sys("$self->{TOOLKIT}bundle-image -i $dir/$imagename.img --ramdisk $eri[1] -d bundle --kernel $eki[1]");
+	$self->sys("$self->{TOOLKIT}upload-bundle -b $prefix-image-bucket -m bundle/$imagename.img.manifest.xml");
 	my @emi_result = $self->sys("$self->{TOOLKIT}register $prefix-image-bucket/$imagename.img.manifest.xml");
 	my @emi = split(/\s/, $emi_result[0]);
 	$self->set_timeout(120);
+	$self->sys("rm -rf bundle");	
 	if($emi_result[0] !~ /emi/){
 		fail("Image not uploaded properly");
 		return -1;
 	}
 	
-	
 	return ($emi[1], $eri[1], $eki[1]);
+	
+}
+
+sub deregister_image{
+	my $self = shift;
+	my $image = shift;
+	test_name("Deregistering image $image");
+	
+	## Execute deregister command
+	my @dereg1 = $self->sys("$self->{TOOLKIT}deregister $image");
+	
+	##If there was no output fail
+	if ( @dereg1 < 1){
+		fail("Deregister image the first time did not return any output");
+		return -1;
+	}else{
+		## Was the image in the output
+		if( $dereg1[0] =~ /$image/){
+			my @desc1 = $self->sys("$self->{TOOLKIT}describe-images | grep $image");
+			## Is the image still in the desc-images output
+			if( @desc1 < 1){
+				fail( "Image $image removed from describe images on first deregister");
+				return -1;
+			}else{
+				## Need to deregister a second time to remove it if its in deregistered 
+				if( $desc1[0] =~ /deregistered/ ){
+					my @dereg2 = $self->sys("$self->{TOOLKIT}deregister $image");
+					
+					if( @dereg2 < 1 ){
+						fail("Deregister image the second time did not return any output");
+						return -1;
+					}else{
+						my @desc2 = $self->sys("$self->{TOOLKIT}describe-images | grep $image");
+						if( @desc2 < 1){
+							pass("Successfully deregistered image $image");
+							my @image_info = split(/\s/,$desc1[0]);
+							my @bucket = split(/\//, $image_info[2]);
+							$self->delete_bundle("$bucket[0]");
+							return $image;
+						}else{
+							fail("Image still in store\n@desc2");
+							return -1;
+						}
+					}
+					
+				}else{
+					fail("Image not in deregistered state\n$desc1[0]\n");
+					return -1;
+				}
+				
+			}
+			
+		}
+	}
+	return -1;
+	
+}
+
+sub delete_bundle{
+	my $self = shift;
+	my $bundle = shift;
+	my @deletebundle = $self->sys("$self->{TOOLKIT}delete-bundle --clear -b $bundle");
+	if( @deletebundle <1){
+		pass("Delete bundle seems to have succeeded");
+		return 0;
+	}else{
+		fail("Output returned from delete-bundle\n@deletebundle");
+		return -1;
+	}
 	
 }
 
@@ -561,28 +963,66 @@ sub run_instance{
 	my $self = shift;
 	my $keypair = shift;
 	my $group = shift;
+	my $OPTS = shift;
+	my $time= time();
+	if( !defined $keypair){
+		$keypair = $self->add_keypair("keypair-" . $time);
+	}
+	if ( !defined $group){
+		$group = "group-" . $time;
+	    $self->add_group($group );
+		
+	}
 	my $address = $self->allocate_address();
 	my $emi = $self->get_emi();
 #	my $keypath =$self->add_keypair($keypair);
 #	$self->add_group($group);
 	test_name("Sending run instance command");
-	my @output =  $self->sys("$self->{TOOLKIT}run-instances -k $keypair -g $group $emi | grep INSTANCE");
-	if ($output[0] =~ /pending/){
-		my @instance = split(' ', $output[0]);
+	my $base_command = "$self->{TOOLKIT}run-instances -g $group -k $keypair  $emi";
+	my @flags = ();
+	
+	my @output =  $self->sys($base_command);
+	if ( @output < 1){
+		fail("Initial attempt at running instance returned nothing");
+		return -1;
+	}
+	
+	### There was output to the run instance command, check if it includes INSTANCE  
+	my @instance = grep(/INSTANCE/, @output);
+	if( @instance < 1){
+		fail("Initial attempt at running instance returned:\n@output");
+		return -1;
+	}
+	
+	### Check for state pending of the INSTANCE right after the run instance command  
+	if ($instance[0] =~ /pending/){
+		my @instance = split(' ', $instance[0]);
 		my $instance_id = $instance[1];
-		test_name("Sleeping 20 seconds then checking instance state");
+		
+		### Waiting for 20s 
+		test_name("Sleeping 20 seconds for instance to get its IP");
 		sleep 20;
 		my ($emi, $ip, $state) = $self->get_instance_info($instance_id);
-		if ( $emi == -1){
+		## If emi- is found then we can assume we have the rest of the info as well
+		if ( $emi !~ /emi-/){
 			fail ("Could not find the instance in the describe instances pool after issuing run and waiting 20s");
 			return -1;
 		}
+		## If we have the info make sure that the Public IP is not stuck on 0.0.0.0
+		if( $ip =~ /0\.0\.0\.0/){
+			fail ("Instance did not get an address within 20s");
+			return -1;
+		}
+		
 		pass("Instance $instance_id started with emi $emi at $instance[9] with IP= $ip");
 		
+		
+		### Poll the instance every 20s for 300s until it leaves the pending state
+		my $period = 20;
 		my $count = 0;
 		while ( ($state eq "pending") && ($count < 15) ){
 			test_name("Polling every 20s until instance in running state");
-			sleep 20;
+			sleep $period;
 			
 			($emi, $ip, $state) = $self->get_instance_info($instance_id);
 			if( $emi !~ /emi/){
@@ -592,13 +1032,14 @@ sub run_instance{
 			$count++;
 		}
 		
+		### If the instance is not running after 300s there was an error
 		if( $state ne "running"){
-			fail("Instance went from pending to $state");
-			return -1;
+			fail("Instance went from pending to $state after 300s");
+			return ($instance_id, $emi, $ip, $state, $keypair);
 		}else{
-			### Returns ($instance_id,  $emi, $ip);
-			pass("Instance is now in $state state");
-			return ($instance_id,  $emi, $ip);
+			### Returns ($instance_id,  $emi, $ip, $state);
+			pass("Instance is now in $state state after " . ( $count * $period ) . " seconds");
+			return ($instance_id,  $emi, $ip, $state, $keypair);
 		}
 		
 		
@@ -653,7 +1094,7 @@ sub get_instance_info{
 		}else{
 			my @info = split(' ', $running[0]);
 			### Returns ($emi, $ip, $state);
-			return ($info[2], $info[3], $info[5]);
+			return ($info[2], $info[3], $info[5], $info[6]);
 		}
 }
 
@@ -665,6 +1106,23 @@ sub teardown_instance{
 	sleep 30;
 	$self->release_address($ip);
 	
+}
+
+sub reboot_instance{
+	my $self = shift;
+	my $instance_id = shift;
+	my ($emi, $ip, $state, $keypair) = $self->get_instance_info($instance_id);
+	my @uptime_old = $self->sys("ssh root\@$ip -i $keypair.priv \"cat /proc/uptime | awk \'{print \$1}\'\"");
+	my @output = $self->sys("$self->{TOOLKIT}reboot-instances $instance_id");
+	sleep 80;
+	my @uptime_new = $self->sys("ssh root\@$ip -i $keypair.priv \"cat /proc/uptime | awk \'{print \$1}\'\"");
+	if( $uptime_old[0] > $uptime_new[0]) {
+		pass("Instance rebooted. Old uptime: $uptime_old[0]  New uptime:  $uptime_new[0]");
+		return $instance_id;
+	}else{
+		fail("Uptime is greater than before reboot. Must not have rebooted instance properly");
+		return -1;
+	}
 }
 
 sub create_volume{
@@ -696,13 +1154,13 @@ sub create_volume{
 	
 	my @vol_id = split(/\s+/, $vol_create[0]);
 	
-	if ( $vol_id[3] !~ /creating/ ){
+	if ( $vol_create[0] !~ /$vol_id[1].*creating.*/ ){
 		fail("After running volume-create output does not show $vol_id[1] as creating");
 		return -1;
 	}
 	else{
 		sleep $vol_timeout;
-		if ( ! $self->found("$self->{TOOLKIT}describe-volumes", qr/$vol_id[1]/) ){
+		if ( ! $self->found("$self->{TOOLKIT}describe-volumes", qr/$vol_id[1].*$zone.*available.*/) ){
 			fail("Unable to create volume");
 			return -1;
 		}
@@ -722,8 +1180,10 @@ sub delete_volume{
 	if( !$self->found("$self->{TOOLKIT}delete-volume $volume", qr/^VOLUME\s+$volume/) ){
 		fail("Failed to delete volume");
 		return -1;
-	}elsif( $self->found("$self->{TOOLKIT}describe-volumes", qr/^VOLUME\s+$volume/ ) ){
-		fail("After delete volume still exists");
+	}
+	sleep 5;
+	if( $self->found("$self->{TOOLKIT}describe-volumes", qr/^VOLUME\s+$volume.*available/ ) ){
+		fail("After delete volume still available");
 		return -1;
 	}else{
 		return $volume;
@@ -763,7 +1223,90 @@ sub detach_volume{
 		return -1;
 	}
 	
-	return 1;
+	return $volume;
+}
+
+sub create_snapshot{
+		my $self = shift;
+        my $volume = shift;
+        my @create_output = $self->sys("euca-create-snapshot $volume");
+        my $poll_interval = 20;
+        my $poll_count = 15;
+        ### Check that there was output from the create command
+        if( @create_output < 1){
+        	fail("Create snapshot returned without output");
+        	return -1;
+        }{
+        	### If there was output check that it shows the SNAPSHOT as pending and the current percentage is increasing
+        	if( $create_output[0] =~ /^SNAPSHOT.*pending/){
+        		my @snapshot_info = split(/ /,$create_output[0] );
+        		my $snap_id = $snapshot_info[1];
+        		pass("Snapshot $snap_id being created and in pending state");
+        		my $old_percentage = 0;
+        		my $current_state = "pending";
+        		
+        		
+        		while( ($poll_count > 0) && ($current_state ne "completed")){
+        			sleep $poll_interval;
+        			my @snapshot_poll = $self->sys("euca-describe-snapshots | grep $snap_id");
+        			if( @snapshot_poll < 1){
+        				fail("Did not find $snap_id in describe-snapshots");
+        				return -1;
+        			}
+        			my @snapshot_info = split(/ /,$snapshot_poll[0] );
+        			my @new_percentage = split (/%/,$snapshot_info[5]);
+        			if( $new_percentage[0] > $old_percentage){
+        				test_name("Snapshot went from $old_percentage to $new_percentage[0]");
+        				$old_percentage = $new_percentage[0];
+        				$current_state = $snapshot_info[3] ;
+        				$poll_count--;
+        				
+        			}else{
+        				fail("Snapshot at same percentage after $poll_interval");
+        				return -1;
+        			}
+        			
+        		}
+        		
+        		if( $current_state eq "completed"){
+        			pass("Successfully created snapshot $snap_id");
+        			return $snap_id;
+        		}else{
+        			fail("Snapshot creation failed");
+        			return -1;
+        		}
+        		
+        	
+        	}else{
+        		fail("Snapshot not in pending state after create");
+        		return -1;
+        	}
+        }
+}
+
+sub delete_snapshot {
+	my $self = shift;
+    my $snap = shift;
+
+    if ($snap !~ /snap-/ ) {
+		fail("ERROR: invalid snapshot ID '$snap' for delete_snapshot");
+		return -1;
+    }
+
+    my $cmd = "$self->{TOOLKIT}delete-snapshot $snap";
+    my @del_out = $self->sys($cmd);
+    if (@del_out < 1){
+    	fail("Delete snapshot returned no output");
+    	return -1;
+    }elsif ( $del_out[0] !~ "snap-") {
+	 	fail("Deleting snapshot did not return snap-id\n");
+	 	return -1;
+    }else{
+    	
+    }
+   
+    
+    return $snap;
 }
 
 #### EUARE COMMANDS ########################

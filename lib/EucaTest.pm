@@ -312,8 +312,11 @@ sub update_testlink{
  		### Remove \n and replace with HTML newline character <br>
  		foreach my $line (@running_log){
  			if($line =~ /fail/i){
-				$line = "<font color=\"red\" size=\"5\">$line</font>";
+				$line = "<font color=\"red\" size=\"4\">$line</font>";
+			}elsif( $line =~ /[.*]/ ){
+				$line = "<font color=\"green\" size=\"2\">$line</font>";
 			}
+			
  			$line =~ s/\n/<br>/g;
  		}
  		##
@@ -350,6 +353,7 @@ sub set_clc_info{
 sub timestamp{
 	 my ($sec,$min,$hour,$mday,$mon,$year,$wday,$yday,$isdst)=localtime(time);
      my $timestamp =  sprintf ("%02d-%02d %02d:%02d:%02d\n",$mon+1,$mday,$hour,$min,$sec);
+	chomp($timestamp);
 	return $timestamp;  
 }
 
@@ -377,19 +381,19 @@ sub sys {
     alarm($systimeout);
       
        my $timestamp =  timestamp();
-  
+  		
 	if( defined  $self->{SSH} ){
 		
-		 print("[REMOTE] $original_cmd\n");
+		 print("[REMOTE - $timestamp] $original_cmd\n");
 		  # 
-		 push(@running_log, "[REMOTE $timestamp] $original_cmd\n");
+		 push(@running_log, "[REMOTE - $timestamp] $original_cmd\n");
 		  @output =  $self->{SSH}->capture( $cmd);
 		 
  		  #$self->{SSH}->error and fail( "SSH ERROR: " . $self->{SSH}->error);
 		 
 	}else{
-		print("[LOCAL] $original_cmd\n");
-		push(@running_log, "[LOCAL $timestamp] $original_cmd\n");
+		print("[LOCAL - $timestamp] $original_cmd\n");
+		push(@running_log, "[LOCAL - $timestamp] $original_cmd\n");
 		@output = `$cmd`;
 		
 	}
