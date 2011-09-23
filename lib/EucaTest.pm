@@ -42,9 +42,11 @@ sub new{
 	my $keypath = $opts->{'keypath'};
 	### IF we are going to a remote server to exec commands
 	if( defined $host ){
+		chomp $host;
 		print "Creating an SSH connection to $host\n";
 		## are we authenticating with keys or with password alone
 		if( defined $keypath){
+			chomp $keypath;
 			 test_name("Creating a keypair authenticated SSH connection to $host\n");
 			$ssh =  Net::OpenSSH->new( $host, key_path => $keypath ,  master_opts => [-o => "StrictHostKeyChecking=no" ]  );
 			$ssh->error and
@@ -313,7 +315,7 @@ sub update_testlink{
  		foreach my $line (@running_log){
  			if($line =~ /fail/i){
 				$line = "<font color=\"red\" size=\"4\">$line</font>";
-			}elsif( $line =~ /[.*]/ ){
+			}elsif( $line =~ /\[.*].*/ ){
 				$line = "<font color=\"green\" size=\"2\">$line</font>";
 			}
 			

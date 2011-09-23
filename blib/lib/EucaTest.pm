@@ -42,9 +42,11 @@ sub new{
 	my $keypath = $opts->{'keypath'};
 	### IF we are going to a remote server to exec commands
 	if( defined $host ){
+		chomp $host;
 		print "Creating an SSH connection to $host\n";
 		## are we authenticating with keys or with password alone
 		if( defined $keypath){
+			chomp $keypath;
 			 test_name("Creating a keypair authenticated SSH connection to $host\n");
 			$ssh =  Net::OpenSSH->new( $host, key_path => $keypath ,  master_opts => [-o => "StrictHostKeyChecking=no" ]  );
 			$ssh->error and
@@ -312,8 +314,11 @@ sub update_testlink{
  		### Remove \n and replace with HTML newline character <br>
  		foreach my $line (@running_log){
  			if($line =~ /fail/i){
-				$line = "<font color=\"red\" size=\"5\">$line</font>";
+				$line = "<font color=\"red\" size=\"4\">$line</font>";
+			}elsif( $line =~ /\[.*].*/ ){
+				$line = "<font color=\"green\" size=\"2\">$line</font>";
 			}
+			
  			$line =~ s/\n/<br>/g;
  		}
  		##
@@ -383,14 +388,14 @@ sub sys {
 		
 		 print("[REMOTE - $timestamp] $original_cmd\n");
 		  # 
-		 push(@running_log, "[REMOTE $timestamp] $original_cmd\n");
+		 push(@running_log, "[REMOTE - $timestamp] $original_cmd\n");
 		  @output =  $self->{SSH}->capture( $cmd);
 		 
  		  #$self->{SSH}->error and fail( "SSH ERROR: " . $self->{SSH}->error);
 		 
 	}else{
 		print("[LOCAL - $timestamp] $original_cmd\n");
-		push(@running_log, "[LOCAL $timestamp] $original_cmd\n");
+		push(@running_log, "[LOCAL - $timestamp] $original_cmd\n");
 		@output = `$cmd`;
 		
 	}
