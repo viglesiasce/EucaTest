@@ -553,7 +553,7 @@ sub send_cred{
 	my $self = shift;
 	my $host = shift;
 	$self->sys("scp -r $self->{CREDPATH} $host");
-	return $self->{CREDPATH};
+	return $self->{CREDPATH};	
 }
 
 sub add_keypair{
@@ -637,34 +637,61 @@ sub found {
 sub add_group{
 	my $self = shift;
 	my $groupname = shift;
-	my $ip = shift;
-	my @add_group = $self->sys("$self->{TOOLKIT}add-group $groupname -d $groupname");
-	if($add_group[0] =~ /GROUP/){
-		pass("Added group $groupname successfully");
-	}
-	else{ 
-		fail("Unable to add group $groupname");
-		return -1;
+	my $rule = shift;
+	
+	
+	
+	### CHECK IF THE GROUP EXISTS
+	my @desc_groups = $self->sys("$self->{TOOLKIT}describe-groups $groupname");
+	
+	### IF IT DOES NOT EXIST CREATE IT 
+	if( @desc_groups < 1){
+		my @add_group = $self->sys("$self->{TOOLKIT}add-group $groupname -d $groupname");
+		if($add_group[0] =~ /GROUP/){
+			pass("Added group $groupname successfully");
+		}
+		else{ 
+			fail("Unable to add group $groupname");
+			return -1;
+		}
+	}else{
+		pass("Group $groupname already exists not creating");
 	}
 	
-	my @auth_icmp = $self->sys("$self->{TOOLKIT}authorize $groupname -P icmp");
-	if($auth_icmp[0] =~ /GROUP/){
-		pass("Added ICMP authorization for $groupname successfully");
-	}
-	else{ 
-		fail("Unable authorize group $groupname for ICMP");
-		return -1;
+	
+	
+	### IF THE USER DOES NOT PROVIDE A RULE CREATE THE GROUP with p22 and icmp
+	if( !defined $rule ){
+		
+		my @auth_icmp = $self->sys("$self->{TOOLKIT}authorize $groupname -P icmp");
+		if($auth_icmp[0] =~ /GROUP/){
+			pass("Added ICMP authorization for $groupname successfully");
+		}
+		else{ 
+			fail("Unable authorize group $groupname for ICMP");
+			return -1;
+		}
+		
+		my @auth_ssh  = $self->sys("$self->{TOOLKIT}authorize $groupname -p 22");
+		if($auth_ssh[0] =~ /GROUP/){
+			pass("Added SSH authorization for $groupname successfully");
+		}
+		else{ 
+			fail("Unable authorize group $groupname for SSH");
+			return -1;
+		}
+	}else{
+		my @auth_rule = $self->sys("$self->{TOOLKIT}authorize $groupname $rule");
+		if($auth_rule[0] =~ /GROUP/){
+			pass("Added $rule authorization for $groupname successfully");
+		}
+		else{ 
+			fail("Unable authorize group $groupname for $rule");
+			return -1;
+		}
 	}
 	
-	my @auth_ssh  = $self->sys("$self->{TOOLKIT}authorize $groupname -p 22");
-	if($auth_ssh[0] =~ /GROUP/){
-		pass("Added SSH authorization for $groupname successfully");
-	}
-	else{ 
-		fail("Unable authorize group $groupname for SSH");
-		return -1;
-	}
-	return (@add_group, @auth_icmp, @auth_ssh);
+	return ($groupname);
 }
 
 
