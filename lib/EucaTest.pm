@@ -14,7 +14,6 @@ our @ISA = qw(Exporter);
 # Items to export into callers namespace by default. Note: do not export
 # names by default without a very good reason. Use EXPORT_OK instead.
 # Do not simply export all your public functions/methods/constants.
-
 # This allows declaration	use EucaTest ':all';
 # If you do not need this, moving things directly into @EXPORT or @EXPORT_OK
 # will save memory.
@@ -111,6 +110,7 @@ sub new{
 
 sub fail {
   my($message) = @_;
+  
   push(@running_log, "^^^^^^[TEST_REPORT] FAILED - $message^^^^^^\n");
   print("^^^^^^[TEST_REPORT] FAILED - $message^^^^^^\n");
   $fail_count++;
@@ -347,6 +347,12 @@ sub set_clc_info{
 	$CLC_INFO = shift;
 	return 0;	
 }
+sub timestamp{
+	 my ($sec,$min,$hour,$mday,$mon,$year,$wday,$yday,$isdst)=localtime(time);
+     my $timestamp =  sprintf ("%02d-%02d %02d:%02d:%02d\n",$mon+1,$mday,$hour,$min,$sec);
+	return $timestamp;  
+}
+
 sub sys {
   my $self = shift;
   my $cmd = shift;
@@ -355,7 +361,7 @@ sub sys {
   if( $self->{CREDPATH} ne ""){
 		$cmd = ". " . $self->{CREDPATH} ."/eucarc && " . $cmd;
   }
-  
+
   sleep($self->{DELAY});
   my $systimeout;
   if(defined $timeout){
@@ -369,19 +375,21 @@ sub sys {
   	$SIG{ALRM} = sub { die "alarm\n"; };
 	eval {		
     alarm($systimeout);
-    
+      
+       my $timestamp =  timestamp();
+  
 	if( defined  $self->{SSH} ){
 		
 		 print("[REMOTE] $original_cmd\n");
 		  # 
-		 push(@running_log, "[REMOTE] $original_cmd\n");
+		 push(@running_log, "[REMOTE $timestamp] $original_cmd\n");
 		  @output =  $self->{SSH}->capture( $cmd);
 		 
  		  #$self->{SSH}->error and fail( "SSH ERROR: " . $self->{SSH}->error);
 		 
 	}else{
 		print("[LOCAL] $original_cmd\n");
-		push(@running_log, "[LOCAL] $original_cmd\n");
+		push(@running_log, "[LOCAL $timestamp] $original_cmd\n");
 		@output = `$cmd`;
 		
 	}
