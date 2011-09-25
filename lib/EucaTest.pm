@@ -320,11 +320,14 @@ sub update_testlink{
  		if( defined $CLC_INFO->{"TEST_NAME"}){
  			my $artifacts_link = "http://10.1.1.210/test_space/". $CLC_INFO->{"TEST_NAME"} . "/" . $CLC_INFO->{"UNIQUE_ID"} ;
  			$artifacts_link = "<a href=\"" . $artifacts_link . "\" style=\"color:blue;font-size:20px;\" target=\"_blank\">Go to Artifacts</a> ";
- 		   $CLC_INFO->{"INPUT_FILE"} =  $artifacts_link .  "\n" .$CLC_INFO->{"INPUT_FILE"};
+ 		   $CLC_INFO->{"INPUT_FILE"} =  $artifacts_link .  "<br>" .$CLC_INFO->{"INPUT_FILE"};
+ 		   $CLC_INFO->{"INPUT_FILE"} =~ s/\n/<br>/g;
+ 		   
  		}
  		$CLC_INFO->{"INPUT_FILE"} = "##################### TEST SETUP #####################\n" . $CLC_INFO->{"INPUT_FILE"} . "\n\n\n##################### TEST OUTPUT #####################\n";
  		
  		### Remove \n and replace with HTML newline character <br>
+ 		
  		foreach my $line (@running_log){
  			if($line =~ /fail/i || $line =~ /error/i ){
  				$status = 'f';
@@ -334,6 +337,7 @@ sub update_testlink{
 			}
 			
  			$line =~ s/\n/<br>/g;
+ 			
  		}
  		unshift(@running_log ,$CLC_INFO->{"INPUT_FILE"} );
  		##
