@@ -326,7 +326,8 @@ sub update_testlink{
  		
  		### Remove \n and replace with HTML newline character <br>
  		foreach my $line (@running_log){
- 			if($line =~ /fail/i){
+ 			if($line =~ /fail/i || $line =~ /error/i ){
+ 				$status = 'f';
 				$line = "<font color=\"red\" size=\"4\">$line</font>";
 			}elsif( $line =~ /\[.*].*/ ){
 				$line = "<font color=\"blue\" size=\"2\">$line</font>";
