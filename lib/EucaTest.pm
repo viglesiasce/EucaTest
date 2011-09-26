@@ -360,8 +360,8 @@ sub update_testlink{
  		my $build_id = $build_response[0];
  		chomp($build_id);
  		$self->sys("ssh root\@192.168.51.187 -o StrictHostKeyChecking=no \'./testlink/update_testcase.pl artifacts/$run_file testcaseexternalid=$tc_id,testplanid=$tplan_id,status=$status,buildid=$build_id,platformid=$platform\'");
- 		$self->sys("ssh root\@192.168.51.187 -o StrictHostKeyChecking=no \'rm -f artifacts/*\'"); 
- 		$self->sys("rm *.log");
+ 		#$self->sys("ssh root\@192.168.51.187 -o StrictHostKeyChecking=no \'rm -f artifacts/$run_file\'"); 
+ 		$self->sys("rm $run_file");
  		print "Updated Testcase: $tc_id in Testplan $tplan_id with result $status on build $build_id which is revno $build\n";
  		return 0;
 }
