@@ -330,7 +330,7 @@ sub update_testlink{
  		
  		foreach my $line (@running_log){
  			if($line =~ /fail/i || $line =~ /error/i ){
- 				$status = 'f';
+ 				#$status = 'f';
 				$line = "<font color=\"red\" size=\"4\">$line</font>";
 			}elsif( $line =~ /\[.*].*/ ){
 				$line = "<font color=\"blue\" size=\"2\">$line</font>";
