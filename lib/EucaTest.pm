@@ -337,7 +337,8 @@ sub update_testlink{
  		### Remove \n and replace with HTML newline character <br>
  		
  		foreach my $line (@running_log){
- 			if($line =~ /\[.*TEST_REPORT.*].*failed/i){
+ 			#if($line =~ /\[.*TEST_REPORT.*].*failed/i){
+ 			if($line =~ /failed/i){
  				$status = 'f';
 				$line = "<font color=\"red\" size=\"4\">$line</font>";
 			}elsif( $line =~ /\[.*].*/ ){
@@ -386,7 +387,7 @@ sub attach_artifacts{
 	my $self = shift;
 	my $exec_id = shift;
 	if( !defined $exec_id || $exec_id == -1){
-		fail("Invalid provided to attach artifacts");
+		 print "Invalid exec_id provided to attach artifacts\n";
 		return -1;
 	} 
 	chomp $exec_id;
