@@ -1414,7 +1414,7 @@ sub euare_create_user{
 		$account="eucalyptus";
 	}
 	$self->sys("euare-usercreate -u $new_user -p $user_path");
-	if (!$self->found("euare-userlistbypath", qr/arn:aws:iam::$account:user$user_path\/$new_user/)) {
+	if (!$self->found("euare-userlistbypath", qr/arn:aws:iam::$account:user$user_path$new_user/)) {
   		fail("could not create new user $new_user\@$account");
   		return -1;
 	}
