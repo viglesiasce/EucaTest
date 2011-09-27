@@ -369,7 +369,10 @@ sub update_testlink{
  		my $build_id = $build_response[0];
  		chomp($build_id);
  		my @exec_resp = $self->sys("ssh root\@192.168.51.187 -o StrictHostKeyChecking=no \'./testlink/update_testcase.pl artifacts/$run_file testcaseexternalid=$tc_id,testplanid=$tplan_id,status=$status,buildid=$build_id,platformid=$platform\'");
- 		
+ 		if(@exec_resp < 1){
+ 			print "Could not update testcase in testplan";
+ 			return -1;
+ 		}
  		
  	   ##UPLOADING THE TC RESULT WILL RETURN ME THE EXEC ID
  		
@@ -394,10 +397,11 @@ sub attach_artifacts{
 	
 	## LOOK FOR ALL THE REMOTE ARTIFACTS UPLOADED 
 	my @remote_artifacts = $self->sys("ssh root\@192.168.51.187 -o StrictHostKeyChecking=no \'ls artifacts/$exec_id\'");
-	#print "@remote_artifacts";
+	
 	foreach my $artifact (@remote_artifacts){
 		chomp $artifact;
-		if( $artifact =~ /run_script/){
+		### SKIP IF ITS NOT A RUN SCRIPT
+		if( $artifact =~ /run-script/){
 			my @exec_resp = $self->sys("ssh root\@192.168.51.187 -o StrictHostKeyChecking=no \'./testlink/upload_attachment.pl artifacts/$exec_id/$artifact filename=$artifact,filetype=text/html,executionid=$exec_id\'");
 		}
 	}
