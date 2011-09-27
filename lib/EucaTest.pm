@@ -397,8 +397,9 @@ sub attach_artifacts{
 	#print "@remote_artifacts";
 	foreach my $artifact (@remote_artifacts){
 		chomp $artifact;
-		my @exec_resp = $self->sys("ssh root\@192.168.51.187 -o StrictHostKeyChecking=no \'./testlink/upload_attachment.pl artifacts/$exec_id/$artifact filename=$artifact,filetype=text/html,executionid=$exec_id\'");
-	
+		if( $artifact =~ /run_script/){
+			my @exec_resp = $self->sys("ssh root\@192.168.51.187 -o StrictHostKeyChecking=no \'./testlink/upload_attachment.pl artifacts/$exec_id/$artifact filename=$artifact,filetype=text/html,executionid=$exec_id\'");
+		}
 	}
 	
 	##DELETE ARTICACTS AFTER UPLOAD
