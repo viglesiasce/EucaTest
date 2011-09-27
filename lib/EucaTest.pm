@@ -1407,7 +1407,12 @@ sub euare_create_user{
 	my $new_user = shift;
 	my $account = shift;
 	my $user_path = shift;
-	
+	if(!defined $user_path){
+		$user_path="/";
+	}
+	if(!defined $account){
+		$account="eucalyptus";
+	}
 	$self->sys("euare-usercreate -u $new_user -p $user_path");
 	if (!$self->found("euare-userlistbypath", qr/arn:aws:iam::$account:user$user_path\/$new_user/)) {
   		fail("could not create new user $new_user\@$account");
@@ -1415,6 +1420,25 @@ sub euare_create_user{
 	}
 	return $new_user;
 }
+sub euare_delete_user{
+	my $self = shift;
+	my $new_user = shift;
+	my $account = shift;
+	my $user_path = shift;
+	if(!defined $user_path){
+		$user_path="/";
+	}
+	if(!defined $account){
+		$account="eucalyptus";
+	}
+	$self->sys("euare-userdel -u $new_user");
+	if ($self->found("euare-userlistbypath", qr/arn:aws:iam::$account:user$user_path\/$new_user/)) {
+  		fail("could not delete user $new_user\@$account");
+  		return -1;
+	}
+	return 0;
+}
+
 
 sub euare_change_username{
 	my $self = shift;
