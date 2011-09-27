@@ -364,7 +364,6 @@ sub update_testlink{
  		
  		
  	   ##UPLOADING THE TC RESULT WILL RETURN ME THE EXEC ID
- 		
  		$self->attach_artifacts($exec_resp[0]);		
  		$self->sys("ssh root\@192.168.51.187 -o StrictHostKeyChecking=no \'rm -f artifacts/*\'"); 		
  		$self->sys("rm $run_file");
@@ -375,16 +374,18 @@ sub update_testlink{
 sub attach_artifacts{
 	my $self = shift;
 	my $exec_id = shift; 
-	
+	chomp $exec_id;
 	## SEND THE ARTIFACTS TO THE REMOTE MACHINE
 	my @mkdir_response = $self->sys("ssh root\@192.168.51.187 -o StrictHostKeyChecking=no \'mkdir artifacts/$exec_id\'");
-	my @scp__artifacts_result = `scp ../artifacts/*.out root\@192.168.51.187:artifacts/$exec_id`;
- 	print "@scp__artifacts_result";
+	my @scp_artifacts_result = `scp ../artifacts/*.out root\@192.168.51.187:artifacts/$exec_id`;
+ 	print "@scp_artifacts_result";
 	
 	## LOOK FOR ALL THE REMOTE ARTIFACTS UPLOADED 
 	my @remote_artifacts = $self->sys("ssh root\@192.168.51.187 -o StrictHostKeyChecking=no \'ls artifacts/$exec_id\'");
 	foreach my $artifact (@remote_artifacts){
+		chomp $artifact;
 		my @exec_resp = $self->sys("ssh root\@192.168.51.187 -o StrictHostKeyChecking=no \'./testlink/upload_attachment.pl artifacts/$exec_id/$artifact filename=$artifact,filetype=text/html,executionid=$exec_id\'");
+	
 	}
 	
 	##DELETE ARTICACTS AFTER UPLOAD
