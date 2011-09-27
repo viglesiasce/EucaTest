@@ -389,7 +389,7 @@ sub attach_artifacts{
 	}
 	
 	##DELETE ARTICACTS AFTER UPLOAD
-	#my @remote_artifacts = $self->sys("ssh root\@192.168.51.187 -o StrictHostKeyChecking=no \'rm -rf artifacts/$exec_id\'");
+	my @remote_artifacts = $self->sys("ssh root\@192.168.51.187 -o StrictHostKeyChecking=no \'rm -rf artifacts/$exec_id\'");
 	return 0;
 }
 
