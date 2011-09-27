@@ -385,8 +385,8 @@ sub update_testlink{
 sub attach_artifacts{
 	my $self = shift;
 	my $exec_id = shift;
-	if(!defined $exec_id){
-		fail("No exec id provided to attach artifacts");
+	if( !defined $exec_id || $exec_id == -1){
+		fail("Invalid provided to attach artifacts");
 		return -1;
 	} 
 	chomp $exec_id;
