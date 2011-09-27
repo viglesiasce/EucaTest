@@ -593,8 +593,11 @@ sub piperun {
 
 
 sub get_cred {
-  my($self, $account, $user) = @_;
-  my $cred_dir = "eucarc-$account-$user";
+  my($self, $account, $user, $cred_dir) = @_;
+  if(!defined $cred_dir){
+  	 $cred_dir = "eucarc-$account-$user";
+  }
+ 
   $self->sys("mkdir " . $cred_dir);
   
   if( !$self->found("ls", qr/$cred_dir/)){
@@ -705,6 +708,7 @@ sub found {
   for my $item ($self->sys($list_cmd )) {
     if ($item =~ /$to_search/) {
       $found = 1;
+      return $found;
     }
   }
   return $found;
@@ -1414,10 +1418,11 @@ sub euare_create_user{
 		$account="eucalyptus";
 	}
 	$self->sys("euare-usercreate -u $new_user -p $user_path");
-	if (!$self->found("euare-userlistbypath", qr/arn:aws:iam::$account:user$user_path$new_user/)) {
-  		fail("could not create new user $new_user\@$account");
+	if (!$self->found("euare-userlistbypath", qr/$new_user/)) {
+  		fail("could not create new user arn:aws:iam::$account:user$user_path$new_user");
   		return -1;
 	}
+	pass("Created new user arn:aws:iam::$account:user$user_path$new_user ");
 	return $new_user;
 }
 sub euare_delete_user{
