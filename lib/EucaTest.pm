@@ -348,6 +348,7 @@ sub update_testlink{
  		my @scp_result = `scp $run_file root\@192.168.51.187:artifacts/$run_file`;
  		print "@scp_result";
  		
+ 		
  		### IF a different testplan is in the memo update that one
  		if ( defined $CLC_INFO->{"TESTPLAN_ID"} ){
  			$tplan_id = $CLC_INFO->{"TESTPLAN_ID"};
@@ -359,12 +360,39 @@ sub update_testlink{
  		my @build_response = $self->sys("ssh root\@192.168.51.187 -o StrictHostKeyChecking=no \'./testlink/update_build.pl testplanid=322 \"$build\"'");
  		my $build_id = $build_response[0];
  		chomp($build_id);
- 		$self->sys("ssh root\@192.168.51.187 -o StrictHostKeyChecking=no \'./testlink/update_testcase.pl artifacts/$run_file testcaseexternalid=$tc_id,testplanid=$tplan_id,status=$status,buildid=$build_id,platformid=$platform\'");
- 		#$self->sys("ssh root\@192.168.51.187 -o StrictHostKeyChecking=no \'rm -f artifacts/$run_file\'"); 
+ 		my @exec_resp = $self->sys("ssh root\@192.168.51.187 -o StrictHostKeyChecking=no \'./testlink/update_testcase.pl artifacts/$run_file testcaseexternalid=$tc_id,testplanid=$tplan_id,status=$status,buildid=$build_id,platformid=$platform\'");
+ 		
+ 		
+ 	   ##UPLOADING THE TC RESULT WILL RETURN ME THE EXEC ID
+ 		
+ 		$self->attach_artifacts($exec_resp[0]);		
+ 		$self->sys("ssh root\@192.168.51.187 -o StrictHostKeyChecking=no \'rm -f artifacts/*\'"); 		
  		$self->sys("rm $run_file");
  		print "Updated Testcase: $tc_id in Testplan $tplan_id with result $status on build $build_id which is revno $build\n";
  		return 0;
 }
+
+sub attach_artifacts{
+	my $self = shift;
+	my $exec_id = shift; 
+	
+	## SEND THE ARTIFACTS TO THE REMOTE MACHINE
+	my @mkdir_response = $self->sys("ssh root\@192.168.51.187 -o StrictHostKeyChecking=no \'mkdir artifacts/$exec_id\'");
+	my @scp__artifacts_result = `scp ../artifacts/*.out root\@192.168.51.187:artifacts/$exec_id`;
+ 	print "@scp__artifacts_result";
+	
+	## LOOK FOR ALL THE REMOTE ARTIFACTS UPLOADED 
+	my @remote_artifacts = $self->sys("ssh root\@192.168.51.187 -o StrictHostKeyChecking=no \'ls artifacts/$exec_id\'");
+	foreach my $artifact (@remote_artifacts){
+		my @exec_resp = $self->sys("ssh root\@192.168.51.187 -o StrictHostKeyChecking=no \'./testlink/upload_attachment.pl artifacts/$exec_id/$artifact filename=$artifact,filetype=text/html,executionid=$exec_id\'");
+	}
+	
+	##DELETE ARTICACTS AFTER UPLOAD
+	#my @remote_artifacts = $self->sys("ssh root\@192.168.51.187 -o StrictHostKeyChecking=no \'rm -rf artifacts/$exec_id\'");
+	return 0;
+}
+
+
 
 sub set_clc_info{
 	my $self = shift;
