@@ -363,9 +363,9 @@ sub update_testlink{
  			$tplan_id = $CLC_INFO->{"TESTPLAN_ID"};
  		}
  		$build = "other";
- 		if ( defined $CLC_INFO->{'BZR_REVISION'}  && $CLC_INFO->{'QA_SOURCE'} =~ qr/bzr/){
+ 		if ( $CLC_INFO->{'QA_SOURCE'} =~ /bzr/i){
  			$build = $CLC_INFO->{'BZR_REVISION'};
- 		}elsif( $CLC_INFO->{'QA_SOURCE'} =~ qr/repo/){
+ 		}elsif( $CLC_INFO->{'QA_SOURCE'} =~ /repo/i){
  				$build = "REPO " . $CLC_INFO->{'BZR_REVISION'};
  		}
  		
