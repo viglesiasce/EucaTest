@@ -354,7 +354,10 @@ sub update_testlink{
  		my $filename = "../status/test.failed";
  		if (-e $filename) {
  			$status = 'f';
- 			print "Failed file Exists!";
+ 			open FAIL, ">$filename" or die $!;
+ 			my @fail_file = <FAIL>;
+ 			close(FAIL);
+ 			unshift(@running_log,"Failed file Exists!\n@fail_file\n");
  		}
  		my $run_file = "run-$tc_id-" . time() .".log";
  		open FILE, ">", "$run_file" or die $!;
