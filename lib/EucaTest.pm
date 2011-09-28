@@ -387,7 +387,7 @@ sub update_testlink{
  				$build = "BZR " . $CLC_INFO->{'BZR_REVISION'};
  		}
  		
- 		my @build_response = $self->sys("ssh root\@192.168.51.187 -o StrictHostKeyChecking=no \'./testlink/update_build.pl testplanid=322 \"$build\"'");
+ 		my @build_response = $self->sys("ssh root\@192.168.51.187 -o StrictHostKeyChecking=no \'./testlink/update_build.pl testplanid=$tplan_id \"$build\"'");
  		my $build_id = $build_response[0];
  		chomp($build_id);
  		my @exec_resp = $self->sys("ssh root\@192.168.51.187 -o StrictHostKeyChecking=no \'./testlink/update_testcase.pl artifacts/$run_file testcaseexternalid=$tc_id,testplanid=$tplan_id,status=$status,buildid=$build_id,platformid=$platform\'");
