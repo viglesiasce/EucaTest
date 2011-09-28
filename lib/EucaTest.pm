@@ -111,8 +111,10 @@ sub new{
 }
 
 sub fail {
-  my($message) = @_;
-  
+  my $message = shift;
+  if (ref($message) eq "EucaTest") {
+	$message = shift;
+	}
   push(@running_log, "^^^^^^[TEST_REPORT] FAILED - $message^^^^^^\n");
   print("^^^^^^[TEST_REPORT] FAILED - $message^^^^^^\n");
   $fail_count++;
