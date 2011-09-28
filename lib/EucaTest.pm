@@ -28,7 +28,7 @@ our @EXPORT = qw(
 );
 
 our $VERSION = '0.01';
-my $exit_on_fail = 0;
+my $exit_on_fail = 1;
 my $fail_count = 0;
 our $ofile = "ubero";
 my $CLC_INFO = {};
@@ -92,7 +92,7 @@ sub new{
 	}
 	$exit_on_fail = $opts->{'exit_on_fail'};	
 	if( !defined $exit_on_fail){
-		$exit_on_fail = 0;
+		$exit_on_fail = 1;
 	}
 	my $self  = { SSH => $ssh , CREDPATH => $credpath, TIMEOUT => $timeout, EUCALYPTUS => $eucadir,  VERIFY_LEVEL=> $verify_level, TOOLKIT => $toolkit, DELAY => $delay, EXIT_ON_FAIL => $exit_on_fail, FAIL_COUNT=> $fail_count};
 	bless $self;
