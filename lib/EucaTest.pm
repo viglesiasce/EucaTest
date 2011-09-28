@@ -111,12 +111,13 @@ sub new{
 }
 
 sub fail {
+  my $self = shift;
   my $message = shift;
   #if (ref($message) eq "EucaTest") {
 	#$message = shift;
 	#}
-  push(@running_log, "^^^^^^[TEST_REPORT] FAILED ^^^^^^\n");
-  print("^^^^^^[TEST_REPORT] FAILED ^^^^^^\n");
+  push(@running_log, "^^^^^^[TEST_REPORT] FAILED $message^^^^^^\n");
+  print("^^^^^^[TEST_REPORT] FAILED $message^^^^^^\n");
   $fail_count++;
   if ($exit_on_fail){
   	exit(1);
