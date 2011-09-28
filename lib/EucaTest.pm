@@ -380,6 +380,7 @@ sub update_testlink{
  		### IF a different testplan is in the memo update that one
  		if ( defined $CLC_INFO->{"TESTPLAN_ID"} ){
  			$tplan_id = $CLC_INFO->{"TESTPLAN_ID"};
+ 			$$tplan_id =~ s/[^\w\d]//g;
  		}
  		$build = "other";
  		if ( $CLC_INFO->{'QA_SOURCE'} =~ /repo/i){
@@ -523,7 +524,7 @@ sub read_input_file{
 				###LOOK FOR THE TESTPLAN_ID IN THE MEMO
 				if( $line =~ /^TESTPLAN_ID/){
 					my @testplan_id = split(/=/, $line);
-					chomp ($testplan_id[1]);
+					$testplan_id[1] =~ s/[^\w\d]//g;
 					$CONFIG{'TESTPLAN_ID'} = $testplan_id[1];
 				}
 				

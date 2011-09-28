@@ -4,11 +4,12 @@ EucaTest - Perl extension for Testing Eucalyptus on the QA infrastructure
 
 =head1 SYNOPSIS
 
-  use EucaTest;
-  This module is intended to act on an Eucalyptus installation using euca2ools that are installed either locally or on a remote host.
-  Both basic building blocks (ie running an arbitrary command on the remote machine) and high level test constructs (ie runnning an instance) are presented to allow test designers the highest level of flexibilty. 
-  
+use EucaTest
+This module is intended to act on an Eucalyptus installation using euca2ools that are installed either locally or on a remote host. Both basic building blocks (ie running an arbitrary command on the remote machine) and high level test constructs (ie runnning an instance) are presented to allow test designers the highest level of flexibilty 
+
 =head1 METHODS
+
+Methods are broken down into Constructor, Test Helpers, Eucalyptus Operatons, Euare Operations
 
 =head2 Constructor
 
@@ -123,7 +124,7 @@ Returns the $groupname on success and -1 on failure
 
 =back
 
-=head2 EXPORT
+=head2 EUARE Operations
 
 None by default.
 
