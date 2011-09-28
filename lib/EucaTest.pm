@@ -380,7 +380,7 @@ sub update_testlink{
  		### IF a different testplan is in the memo update that one
  		if ( defined $CLC_INFO->{"TESTPLAN_ID"} ){
  			$tplan_id = $CLC_INFO->{"TESTPLAN_ID"};
- 			$$tplan_id =~ s/[^\w\d]//g;
+ 			$tplan_id =~ s/[^\w\d]//g;
  		}
  		$build = "other";
  		if ( $CLC_INFO->{'QA_SOURCE'} =~ /repo/i){
@@ -711,15 +711,15 @@ sub delete_keypair{
 			if( !$self->found("$self->{TOOLKIT}describe-keypairs", qr/$keyname/) ){
 				pass("Deleted keypair $keyname");
 				$self->sys("rm -f $filepath");
-				return @output;
+				return $keyname;
 			}else{
 				$self->fail("Keypair is still present or a keypair with this keypairs name embedded exists");
-				return @output;
+				return -1;
 			}
 			
 	}else{
 		$self->fail("Delete keypair command did not return the keypair which was deleted");
-		return @output;
+		return -1;
 	}
 }
 
