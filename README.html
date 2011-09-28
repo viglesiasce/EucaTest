@@ -1,0 +1,218 @@
+<?xml version="1.0" ?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml">
+<head>
+<title>EucaTest - Perl extension for Testing Eucalyptus on the QA infrastructure</title>
+<meta http-equiv="content-type" content="text/html; charset=utf-8" />
+<link rev="made" href="mailto:_mdnsresponder@fifth.apple.com" />
+</head>
+
+<body style="background-color: white">
+
+
+<!-- INDEX BEGIN -->
+<div name="index">
+<p><a name="__index__"></a></p>
+
+<ul>
+
+	<li><a href="#name">NAME</a></li>
+	<li><a href="#synopsis">SYNOPSIS</a></li>
+	<li><a href="#methods">METHODS</a></li>
+	<ul>
+
+		<li><a href="#constructor">Constructor</a></li>
+		<li><a href="#test_helpers">Test Helpers</a></li>
+		<li><a href="#eucalyptus_operations">Eucalyptus Operations</a></li>
+		<li><a href="#euare_operations">EUARE Operations</a></li>
+	</ul>
+
+	<li><a href="#history">HISTORY</a></li>
+	<li><a href="#see_also">SEE ALSO</a></li>
+	<li><a href="#author">AUTHOR</a></li>
+	<li><a href="#copyright_and_license">COPYRIGHT AND LICENSE</a></li>
+</ul>
+
+<hr name="index" />
+</div>
+<!-- INDEX END -->
+
+<p>
+</p>
+<h1><a name="name">NAME</a></h1>
+<p>EucaTest - Perl extension for Testing Eucalyptus on the QA infrastructure</p>
+<p>
+</p>
+<hr />
+<h1><a name="synopsis">SYNOPSIS</a></h1>
+<p>use EucaTest
+This module is intended to act on an Eucalyptus installation using euca2ools that are installed either locally or on a remote host. Both basic building blocks (ie running an arbitrary command on the remote machine) and high level test constructs (ie runnning an instance) are presented to allow test designers the highest level of flexibilty</p>
+<p>
+</p>
+<hr />
+<h1><a name="methods">METHODS</a></h1>
+<p>Methods are broken down into Constructor, Test Helpers, Eucalyptus Operatons, Euare Operations</p>
+<p>
+</p>
+<h2><a name="constructor">Constructor</a></h2>
+<dl>
+<dt><strong><a name="new" class="item">new( %OPTS )</a></strong></dt>
+
+<dd>
+<p>Creates and returns a new EucaTest object. 
+[LOCAL CONNECTION]
+When no arguments are passed in the opts hash the default behavior is to start a local session.
+[REMOTE CONNECTION]
+In order to connect to a remote host the 'host' value must be passed in as follows: EucaTest-&gt;new({ host =&gt; &quot;root:foobar\@myserver.org&quot;})</p>
+<p>Other optional parameters to pass in the %OPTS hash:
+keypath=&gt; this expects the path to a local private key file to use to authenticate the remote ssh session 
+credpath=&gt; path to where credentials for the DUT can be found (by default on creation of the EucaTest object it wil attempt to download its own credentials)
+delay=&gt; sets a sleep timer in between sending commands to the remote host. (DEFAULT: 0)
+timeout=&gt; timeout for any single command sent to the host (DEFAULT:120)
+toolkit=&gt; can choose whether to use euca- or ec2- commands, send string &quot;ec2-&quot; to change from the default of &quot;euca-&quot;</p>
+<p>When the EucaTest object is created it will attempt to download admin credentials unless the credpath has been sent to the constructor. 
+Each EucaTest object keeps a running log of the commands and output run against it.</p>
+</dd>
+</dl>
+<p>
+</p>
+<h2><a name="test_helpers">Test Helpers</a></h2>
+<dl>
+<dt><strong><a name="fail" class="item">$test_session-&gt;<code>fail($message)</code></a></strong></dt>
+
+<dd>
+<p>Logs and prints &quot;[TEST_REPORT] FAILED:  $message&quot; and increments the FAIL_COUNT for the session in order to track failures to determine proper exit code</p>
+<p>returns 0;</p>
+</dd>
+<dt><strong><a name="pass" class="item"><code>pass($message)</code></a></strong></dt>
+
+<dd>
+<p>Logs and prints &quot;[TEST_REPORT] PASSED:  $message&quot;</p>
+</dd>
+<dt><strong><a name="test_name" class="item"><code>test_name($name)</code></a></strong></dt>
+
+<dd>
+<p>Logs and prints &quot;******[TEST_REPORT] ACTION - $name ******</p>
+</dd>
+<dt><strong><a name="log" class="item">$test_session-&gt;<code>log($message)</code></a></strong></dt>
+
+<dd>
+<p>Logs $message</p>
+</dd>
+<dt><strong><a name="tee" class="item">$test_session-&gt;<code>tee($message)</code></a></strong></dt>
+
+<dd>
+<p>Logs and prints $message</p>
+</dd>
+<dt><strong><a name="attach_artifacts" class="item">$test_session-&gt;<code>attach_artifacts($exec_id)</code></a></strong></dt>
+
+<dd>
+<p>Attaches artifacts found in ../artifacts/*.out to the given $exec_id in Testlink</p>
+<p>returns 0 on success and -1 on failure</p>
+</dd>
+<dt><strong><a name="cleanup" class="item">$test_session-&gt;cleanup([$testcase_id, $testplan_id])</a></strong></dt>
+
+<dd>
+<p>If testcase_id and testplan_id are provided then it updates testlink with the running log then deletes .priv .log or credential files</p>
+</dd>
+<dt><strong><a name="clear_log" class="item">$test_session-&gt;<code>clear_log()</code></a></strong></dt>
+
+<dd>
+<p>Set the running_log of the EucaTest instance to &quot;&quot;</p>
+</dd>
+</dl>
+<p>
+</p>
+<h2><a name="eucalyptus_operations">Eucalyptus Operations</a></h2>
+<dl>
+<dt><strong><a name="add_group" class="item">$test_session-&gt;add_group($groupname[, $rule])</a></strong></dt>
+
+<dd>
+<p>Adds a security group rule to a Eucalyptus group. First checks to see if the group exists, if it doesn't exist it gets created with the name $groupname.
+If no rule is provided then the default is to add authorizations for port 22 tcp (SSH) and for the ICMP protocol
+Returns the groupname name if succeeded or -1 if its a failure</p>
+</dd>
+<dt><strong><a name="add_keypair" class="item">$test_session-&gt;<code>add_keypair($keypair)</code></a></strong></dt>
+
+<dd>
+<p>Adds a keypair named $keypair and stores the keyfile at ~/$keypair.priv
+Returns the keypair name if succeeded or -1 if its a failure</p>
+</dd>
+<dt><strong><a name="allocate_address" class="item">$test_session-&gt;<code>allocate_address()</code></a></strong></dt>
+
+<dd>
+<p>Allocates an address.
+Returns ip on success or -1 on failure.</p>
+</dd>
+<dt><strong><a name="attach_volume" class="item">$test_session-&gt;attach_volume($volume_id, $instance, $device)</a></strong></dt>
+
+<dd>
+<p>Attaches the $volume to the $instance as $device.
+Returns the $volume_id on success and -1 on failure</p>
+</dd>
+<dt><strong><a name="create_snapshot" class="item">$test_session-&gt;<code>create_snapshot($volume_id)</code></a></strong></dt>
+
+<dd>
+<p>Creates a snapshot of the volume.
+Returns the $snap_id on success and -1 on failure</p>
+</dd>
+<dt><strong><a name="create_volume" class="item">$test_session-&gt;create_volume($zone, {size=&gt; x}) or  $test_session-&gt;create_volume($zone, {snapshot=&gt; x})</a></strong></dt>
+
+<dd>
+<pre>
+
+Creates a volume in the given availability zone $zone (required) using either the $size or snapshot given. If both options are provided the size takes precedent.
+Returns the $volume_id on success and -1 on failure</pre>
+</dd>
+<dt><strong><a name="delete_bundle" class="item">$test_session-&gt;<code>delete_bundle($bucket_name)</code></a></strong></dt>
+
+<dd>
+<p>Deletes a bucket using the --clear flag to clear all objects and buckets.
+Returns the 0 on success and -1 on failure</p>
+</dd>
+<dt><strong><a name="delete_group" class="item">$test_session-&gt;<code>delete_group($groupname)</code></a></strong></dt>
+
+<dd>
+<p>Deletes a security group.
+Returns the $groupname on success and -1 on failure</p>
+</dd>
+</dl>
+<p>
+</p>
+<h2><a name="euare_operations">EUARE Operations</a></h2>
+<p>None by default.</p>
+<p>
+</p>
+<hr />
+<h1><a name="history">HISTORY</a></h1>
+<ol>
+<li><strong><a name="01" class="item">01</a></strong>
+
+<p>Original version; created by h2xs 1.23 with options</p>
+<pre>
+  -ACXn
+        EucaTest is now working under the Eucalyptus QA system.</pre>
+</li>
+</ol>
+<p>
+</p>
+<hr />
+<h1><a name="see_also">SEE ALSO</a></h1>
+<p>www.eucalyptus.com</p>
+<p>
+</p>
+<hr />
+<h1><a name="author">AUTHOR</a></h1>
+<p>Victor Iglesias, &lt;<a href="mailto:vic.iglesias@eucalyptus.com">vic.iglesias@eucalyptus.com</a>&gt;</p>
+<p>
+</p>
+<hr />
+<h1><a name="copyright_and_license">COPYRIGHT AND LICENSE</a></h1>
+<p>Copyright (C) 2011 by Victor Iglesias</p>
+<p>This library is free software; you can redistribute it and/or modify
+it under the same terms as Perl itself, either Perl version 5.12.4 or,
+at your option, any later version of Perl 5 you may have available.</p>
+
+</body>
+
+</html>
