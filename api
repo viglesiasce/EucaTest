@@ -74,12 +74,11 @@ If testcase_id and testplan_id are provided then it updates testlink with the ru
 
 Set the running_log of the EucaTest instance to ""
 
-=item 
-
-
 =back
 
 =head2 Eucalyptus Operations
+
+=over 4
 
 =item $test_session->add_group($groupname[, $rule])
 
@@ -116,6 +115,13 @@ Returns the $volume_id on success and -1 on failure
 
 Deletes a bucket using the --clear flag to clear all objects and buckets.
 Returns the 0 on success and -1 on failure
+
+=item $test_session->delete_group($groupname)
+
+Deletes a security group.
+Returns the $groupname on success and -1 on failure
+
+=back
 
 =head2 EXPORT
 

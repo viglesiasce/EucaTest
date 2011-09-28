@@ -363,11 +363,12 @@ sub update_testlink{
  		my $filename = "../status/test.failed";
  		if (-e $filename) {
  			$status = 'f';
- 			open FAIL, ">$filename" or die $!;
+ 			open FAIL, "<$filename" or die $!;
  			my @fail_file = <FAIL>;
  			close(FAIL);
  			unshift(@running_log,"Failed file Exists!\n@fail_file\n");
  		}
+ 		chomp($tc_id);
  		my $run_file = "run-$tc_id-" . time() .".log";
  		open FILE, ">", "$run_file" or die $!;
  		print FILE"@running_log";
@@ -387,6 +388,7 @@ sub update_testlink{
  				$build = "BZR " . $CLC_INFO->{'BZR_REVISION'};
  		}
  		chomp($tplan_id);
+ 		
  		my @build_response = $self->sys("ssh root\@192.168.51.187 -o StrictHostKeyChecking=no \'./testlink/update_build.pl testplanid=$tplan_id \"$build\"'");
  		my $build_id = $build_response[0];
  		chomp($build_id);
@@ -429,7 +431,7 @@ sub attach_artifacts{
 	}
 	
 	##DELETE ARTICACTS AFTER UPLOAD
-	my @remove_artifacts = $self->sys("ssh root\@192.168.51.187 -o StrictHostKeyChecking=no \'rm -rf artifacts/$exec_id\'");
+	my @remove_artifacts = $self->sys("ssh root\@192.168.51.187 -o StrictHostKeyChecking=no \'rm -rf artifacts/$exec_id/*\'");
 	return 0;
 }
 
