@@ -124,7 +124,7 @@
 .\" ========================================================================
 .\"
 .IX Title "EucaTest 3"
-.TH EucaTest 3 "2011-09-26" "perl v5.12.3" "User Contributed Perl Documentation"
+.TH EucaTest 3 "2011-09-28" "perl v5.12.3" "User Contributed Perl Documentation"
 .\" For nroff, turn off justification.  Always turn off hyphenation; it makes
 .\" way too many mistakes in technical documents.
 .if n .ad l
@@ -138,8 +138,39 @@ EucaTest \- Perl extension for Testing Eucalyptus on the QA infrastructure
 \&  This module is intended to act on an Eucalyptus installation using euca2ools that are installed either locally or on a remote host.
 \&  Both basic building blocks (ie running an arbitrary command on the remote machine) and high level test constructs (ie runnning an instance) are presented to allow test designers the highest level of flexibilty.
 .Ve
-.SH "DESCRIPTION"
-.IX Header "DESCRIPTION"
+.SH "METHODS"
+.IX Header "METHODS"
+.SS "Constructor"
+.IX Subsection "Constructor"
+.ie n .IP "new( %OPTS )" 4
+.el .IP "new( \f(CW%OPTS\fR )" 4
+.IX Item "new( %OPTS )"
+Creates and returns a new EucaTest object. 
+[\s-1LOCAL\s0 \s-1CONNECTION\s0]
+When no arguments are passed in the opts hash the default behavior is to start a local session.
+[\s-1REMOTE\s0 \s-1CONNECTION\s0]
+In order to connect to a remote host the 'host' value must be passed in as follows: EucaTest\->new({ host => \*(L"root:foobar\e@myserver.org\*(R"})
+.Sp
+Other optional parameters to pass in the \f(CW%OPTS\fR hash:
+keypath=> this expects the path to a local private key file to use to authenticate the remote ssh session
+.SS "Access"
+.IX Subsection "Access"
+.ie n .IP "$circle\->center" 4
+.el .IP "\f(CW$circle\fR\->center" 4
+.IX Item "$circle->center"
+Returns a list of the x,y coordinates 
+of the center of the circle.
+.Sp
+In scalar context, 
+returns an array reference.
+.ie n .IP "$circle\->radius" 4
+.el .IP "\f(CW$circle\fR\->radius" 4
+.IX Item "$circle->radius"
+Returns the radius of the circle.
+.ie n .IP "$circle\->area" 4
+.el .IP "\f(CW$circle\fR\->area" 4
+.IX Item "$circle->area"
+Returns the area of the circle.
 .SS "\s-1EXPORT\s0"
 .IX Subsection "EXPORT"
 None by default.

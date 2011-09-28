@@ -34,6 +34,11 @@ our $ofile = "ubero";
 my $CLC_INFO = {};
 my @running_log;
 open(STDERR, ">&STDOUT");
+
+##################
+
+##################
+
 sub new{
 	my $ssh;
 	my $class = shift;
@@ -121,6 +126,7 @@ sub fail {
   #if (0){
   #	exit(1);
   #}
+  return 0;
 }
 
 # Print formatted success message
@@ -515,6 +521,7 @@ sub read_input_file{
 				###LOOK FOR THE TESTPLAN_ID IN THE MEMO
 				if( $line =~ /^TESTPLAN_ID/){
 					my @testplan_id = split(/=/, $line);
+					chomp ($testplan_id[1]);
 					$CONFIG{'TESTPLAN_ID'} = $testplan_id[1];
 				}
 				
@@ -801,7 +808,7 @@ sub delete_group{
 	my @add_group = $self->sys("$self->{TOOLKIT}delete-group $groupname");
 	if($add_group[0] =~ /GROUP/){
 		pass("Deleted group $groupname successfully");
-		return @add_group;
+		return $groupname;
 	}
 	else{ 
 		$self->fail("Unable to delete group $groupname");
@@ -1286,12 +1293,17 @@ sub attach_volume{
 	my $volume = shift;
 	my $instance = shift;
 	my $device = shift;
-	
+	if( !defined $volume || !defined $instance || !defined $device){
+		$self->fail("Missing parameters to EucaTest->attach_volume");
+		return -1;
+	}
 	
 	if( !$self->found("$self->{TOOLKIT}attach-volume $volume -i $instance -d $device", qr/^VOLUME\s+$volume/ ) ){
 		$self->fail("Attachment failed");
 		return -1;
-	}elsif( !$self->found("$self->{TOOLKIT}describe-volumes",qr/^VOLUME\s+$volume.*in-use/ )  ){
+	}
+	sleep 10;
+	if( !$self->found("$self->{TOOLKIT}describe-volumes",qr/^VOLUME\s+$volume.*in-use/ )  ){
 		$self->fail("Attachment not appearing in describe volumes as in use");
 		return -1;
 	}else{
@@ -1769,10 +1781,47 @@ EucaTest - Perl extension for Testing Eucalyptus on the QA infrastructure
   This module is intended to act on an Eucalyptus installation using euca2ools that are installed either locally or on a remote host.
   Both basic building blocks (ie running an arbitrary command on the remote machine) and high level test constructs (ie runnning an instance) are presented to allow test designers the highest level of flexibilty. 
   
+=head1 METHODS
 
-=head1 DESCRIPTION
+=head2 Constructor
+
+=over 4
+
+=item new( %OPTS )
+
+Creates and returns a new EucaTest object. 
+[LOCAL CONNECTION]
+When no arguments are passed in the opts hash the default behavior is to start a local session.
+[REMOTE CONNECTION]
+In order to connect to a remote host the 'host' value must be passed in as follows: EucaTest->new({ host => "root:foobar\@myserver.org"})
+
+Other optional parameters to pass in the %OPTS hash:
+keypath=> this expects the path to a local private key file to use to authenticate the remote ssh session 
 
 
+=back
+
+=head2 Access
+
+=over 4
+
+=item $circle->center
+
+Returns a list of the x,y coordinates 
+of the center of the circle.
+
+In scalar context, 
+returns an array reference.
+
+=item $circle->radius
+
+Returns the radius of the circle.
+
+=item $circle->area
+
+Returns the area of the circle.
+
+=back
 
 =head2 EXPORT
 
