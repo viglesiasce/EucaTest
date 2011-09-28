@@ -265,7 +265,7 @@ sub update_testlink{
 	### Get status from total fail_count
 	if( !defined $status){
 		$status = 'f';
-		if( $fail_count == 0){
+		if( $self->get_fail_count() == 0){
  			$status= "p";
  		}
 	}
