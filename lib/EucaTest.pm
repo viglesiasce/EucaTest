@@ -49,13 +49,11 @@ sub new{
 			chomp $keypath;
 			 test_name("Creating a keypair authenticated SSH connection to $host");
 			$ssh =  Net::OpenSSH->new( $host, key_path => $keypath ,  master_opts => [-o => "StrictHostKeyChecking=no" ]  );
-			$ssh->error and
-   			$self->fail( $ssh->error);
+			print $ssh->error;
 		}else{
 			test_name( "Creating a password authenticated SSH connection to $host");
 			$ssh =  Net::OpenSSH->new($host,  master_opts => [-o => "StrictHostKeyChecking=no" ] );
-			$ssh->error and
-   			$self->fail( $ssh->error);
+			print $ssh->error;
 		}
 	}else{ 
 		print "Creating a LOCAL connection\n";
@@ -119,9 +117,9 @@ sub fail {
   push(@running_log, "^^^^^^[TEST_REPORT] FAILED $message^^^^^^\n");
   print("^^^^^^[TEST_REPORT] FAILED $message^^^^^^\n");
   $fail_count++;
-  if (0){
-  	exit(1);
-  }
+  #if (0){
+  #	exit(1);
+  #}
 }
 
 # Print formatted success message
