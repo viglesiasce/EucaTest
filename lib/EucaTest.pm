@@ -350,6 +350,12 @@ sub update_testlink{
  		}
  		#unshift(@running_log ,$CLC_INFO->{"INPUT_FILE"} );
  		##
+ 		### CHECK FOR test.fail file in status directory
+ 		my $filename = "../status/test.failed";
+ 		if (-e $filename) {
+ 			$status = 'f';
+ 			print "Failed file Exists!";
+ 		}
  		my $run_file = "run-$tc_id-" . time() .".log";
  		open FILE, ">", "$run_file" or die $!;
  		print FILE"@running_log";
