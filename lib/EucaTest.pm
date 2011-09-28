@@ -386,7 +386,7 @@ sub update_testlink{
  		}else{
  				$build = "BZR " . $CLC_INFO->{'BZR_REVISION'};
  		}
- 		
+ 		chomp($tplan_id);
  		my @build_response = $self->sys("ssh root\@192.168.51.187 -o StrictHostKeyChecking=no \'./testlink/update_build.pl testplanid=$tplan_id \"$build\"'");
  		my $build_id = $build_response[0];
  		chomp($build_id);
