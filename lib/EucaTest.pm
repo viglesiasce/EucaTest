@@ -363,10 +363,10 @@ sub update_testlink{
  			$tplan_id = $CLC_INFO->{"TESTPLAN_ID"};
  		}
  		$build = "other";
- 		if ( $CLC_INFO->{'QA_SOURCE'} =~ /bzr/i){
- 			$build = $CLC_INFO->{'BZR_REVISION'};
- 		}elsif( $CLC_INFO->{'QA_SOURCE'} =~ /repo/i){
- 				$build = "REPO " . $CLC_INFO->{'BZR_REVISION'};
+ 		if ( $CLC_INFO->{'QA_SOURCE'} =~ /repo/i){
+ 			$build =  "REPO " . $CLC_INFO->{'BZR_REVISION'};
+ 		}else{
+ 				$build = "BZR " . $CLC_INFO->{'BZR_REVISION'};
  		}
  		
  		my @build_response = $self->sys("ssh root\@192.168.51.187 -o StrictHostKeyChecking=no \'./testlink/update_build.pl testplanid=322 \"$build\"'");
