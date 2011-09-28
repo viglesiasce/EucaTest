@@ -363,9 +363,12 @@ sub update_testlink{
  			$tplan_id = $CLC_INFO->{"TESTPLAN_ID"};
  		}
  		$build = "other";
- 		if ( defined $CLC_INFO->{'BZR_REVISION'}){
+ 		if ( defined $CLC_INFO->{'BZR_REVISION'}  && $CLC_INFO->{'QA_SOURCE'} =~ qr/bzr/){
  			$build = $CLC_INFO->{'BZR_REVISION'};
+ 		}elsif( $CLC_INFO->{'QA_SOURCE'} =~ qr/repo/){
+ 				$build = "REPO " . $CLC_INFO->{'BZR_REVISION'};
  		}
+ 		
  		my @build_response = $self->sys("ssh root\@192.168.51.187 -o StrictHostKeyChecking=no \'./testlink/update_build.pl testplanid=322 \"$build\"'");
  		my $build_id = $build_response[0];
  		chomp($build_id);
@@ -522,7 +525,11 @@ sub read_input_file{
 			if( $line =~ /^NETWORK/){
 					my @network = split(/\s+/, $line);
 					$CONFIG{'NETWORK'} = $network[1];
-				}				
+				}
+			if( $line =~ /^BZR_BRANCH/){
+					my @bzr_branch = split(/\s+/, $line);
+					$CONFIG{'BZR_BRANCH'} = $bzr_branch[1];
+				}						
 				
         	if( $line =~ /^([\d\.]+)\t(.+)\t(.+)\t(\d+)\t(.+)\t\[(.+)\]/ ){
 			my $qa_ip = $1;
@@ -1436,7 +1443,7 @@ sub euare_delete_user{
 	if(!defined $account){
 		$account="eucalyptus";
 	}
-	$self->sys("euare-userdel -u $new_user");
+	$self->sys("euare-userdel -ru $new_user");
 	if ($self->found("euare-userlistbypath", qr/arn:aws:iam::$account:user$user_path\/$new_user/)) {
   		fail("could not delete user $new_user\@$account");
   		return -1;
