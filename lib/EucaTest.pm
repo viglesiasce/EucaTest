@@ -29,7 +29,7 @@ our @EXPORT = qw(
 
 our $VERSION = '0.01';
 my $exit_on_fail = 1;
-my $fail_count = 0;
+
 our $ofile = "ubero";
 my $CLC_INFO = {};
 my @running_log;
@@ -40,6 +40,7 @@ sub new{
 	my $opts = shift;
 	my $host = $opts->{'host'};
 	my $keypath = $opts->{'keypath'};
+	my $fail_count = 0;
 	### IF we are going to a remote server to exec commands
 	if( defined $host ){
 		chomp $host;
@@ -116,7 +117,7 @@ sub fail {
 	#}
   push(@running_log, "^^^^^^[TEST_REPORT] FAILED $message^^^^^^\n");
   print("^^^^^^[TEST_REPORT] FAILED $message^^^^^^\n");
-  $fail_count++;
+  $self->{FAIL_COUNT}++;
   #if (0){
   #	exit(1);
   #}
@@ -146,15 +147,16 @@ sub log{
 sub tee{
 	my $self =shift;
 	my $message = shift;
-	push(@running_log, "$message");
+	$self->log("$message");
 	print($message);
 	return 0;
 }
 
 sub get_fail_count{
 	my $self = shift;
-	return $fail_count;
+	return $self->{FAIL_COUNT};
 }
+
 sub get_verifylevel{
 	my $self = shift;
 	return $self->{VERIFYLEVEL};
@@ -483,7 +485,7 @@ sub sys {
 		die unless $@ eq "alarm\n"; # propagate unexpected errors
 		# timed out
 		$self->tee("@output\n"); 
-		$self->$self->fail("Timeout occured after $systimeout seconds\n"); 
+		$self->fail("Timeout occured after $systimeout seconds\n"); 
 		
 		return @output;
 	}
@@ -722,7 +724,7 @@ sub get_keypair{
 sub found {
   my($self, $list_cmd, $to_search) = @_;
   my $found = 0;
-  for my $item ($self->sys($list_cmd )) {
+  for my $item ($self->sys($list_cmd)) {
     if ($item =~ /$to_search/) {
       $found = 1;
       return $found;
