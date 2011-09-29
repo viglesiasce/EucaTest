@@ -1206,8 +1206,8 @@ sub teardown_instance{
 	my $instance_id = shift;
 	my $ip = shift;
 	$self->terminate_instance($instance_id);
-	sleep 30;
-	$self->release_address($ip);
+	#sleep 30;
+	#$self->release_address($ip);
 	
 }
 
