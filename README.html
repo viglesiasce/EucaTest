@@ -45,8 +45,7 @@
 </p>
 <hr />
 <h1><a name="synopsis">SYNOPSIS</a></h1>
-<p>use EucaTest
-This module is intended to act on an Eucalyptus installation using euca2ools that are installed either locally or on a remote host. Both basic building blocks (ie running an arbitrary command on the remote machine) and high level test constructs (ie runnning an instance) are presented to allow test designers the highest level of flexibilty</p>
+<p>This module is intended to act on an Eucalyptus installation using euca2ools that are installed either locally or on a remote host. Both basic building blocks (ie running an arbitrary command on the remote machine) and high level test constructs (ie runnning an instance) are presented to allow test designers the highest level of flexibilty</p>
 <p>
 </p>
 <hr />
@@ -59,11 +58,11 @@ This module is intended to act on an Eucalyptus installation using euca2ools tha
 <dt><strong><a name="new" class="item">new( %OPTS )</a></strong></dt>
 
 <dd>
-<p>Creates and returns a new EucaTest object. 
-[LOCAL CONNECTION]
-When no arguments are passed in the opts hash the default behavior is to start a local session.
-[REMOTE CONNECTION]
-In order to connect to a remote host the 'host' value must be passed in as follows: EucaTest-&gt;new({ host =&gt; &quot;root:foobar\@myserver.org&quot;})</p>
+<p>Creates and returns a new EucaTest object.</p>
+<p>[LOCAL CONNECTION]
+When no host argument is passed in the opts hash the default behavior is to start a local session.</p>
+<p>[REMOTE CONNECTION]
+In order to connect to a remote host the 'host' value must be passed in as follows: EucaTest-&gt;new({ host =&gt; &quot;root:foobar\@myserver.org&quot;}). The password is optional if pub keys have been exchanged otherwise one can use a private key path in the keypath option.</p>
 <p>Other optional parameters to pass in the %OPTS hash:
 keypath=&gt; this expects the path to a local private key file to use to authenticate the remote ssh session 
 credpath=&gt; path to where credentials for the DUT can be found (by default on creation of the EucaTest object it wil attempt to download its own credentials)
@@ -120,6 +119,17 @@ Each EucaTest object keeps a running log of the commands and output run against 
 <dd>
 <p>Set the running_log of the EucaTest instance to &quot;&quot;</p>
 </dd>
+<dt><strong><a name="found" class="item">$test_session-&gt;found($command, qr/regex/)</a></strong></dt>
+
+<dd>
+<p>Executes the $command then does a multiline search for /regex/. 
+Returns 1 if the regex is found 0 if it is not.</p>
+</dd>
+<dt><strong><a name="get_fail_count" class="item">$test_session-&gt;<code>get_fail_count()</code></a></strong></dt>
+
+<dd>
+<p>Returns the number of times the fail method was called in this session;</p>
+</dd>
 </dl>
 <p>
 </p>
@@ -175,6 +185,67 @@ Returns the 0 on success and -1 on failure</p>
 <dd>
 <p>Deletes a security group.
 Returns the $groupname on success and -1 on failure</p>
+</dd>
+<dt><strong><a name="delete_keypair" class="item">$test_session-&gt;<code>delete_keypair($keypair)</code></a></strong></dt>
+
+<dd>
+<p>Deletes the keypair and the file found at $keypair.priv.
+Returns the $keypair on success and -1 on failure</p>
+</dd>
+<dt><strong><a name="delete_snapshot" class="item">$test_session-&gt;<code>delete_snapshot($snapid)</code></a></strong></dt>
+
+<dd>
+<p>Deletes the snapshot $snapid.
+Returns the $snapid on success and -1 on failure</p>
+</dd>
+<dt><strong><a name="delete_volume" class="item">$test_session-&gt;<code>delete_volume($volumeid)</code></a></strong></dt>
+
+<dd>
+<p>Deletes the volume $volumeid.
+Returns the $volumeid on success and -1 on failure</p>
+</dd>
+<dt><strong><a name="deregister_image" class="item">$test_session-&gt;<code>deregister_image($imageid)</code></a></strong></dt>
+
+<dd>
+<p>Deregister the image $imageid.Make sure it shows as deregistered then deregister again and make sure its gone.
+Returns the $imageid on success and -1 on failure</p>
+</dd>
+<dt><strong><a name="detach_volume" class="item">$test_session-&gt;<code>detach_volume($volumeid)</code></a></strong></dt>
+
+<dd>
+<p>Detaches the volume $volumeid ensures that it returns the $volumeid then waits 5 seconds and checks again for the volume to be available.
+Returns the $volumeid on success and -1 on failure</p>
+</dd>
+<dt><strong><a name="get_emi" class="item">$test_session-&gt;<code>get_emi()</code></a></strong></dt>
+
+<dd>
+<p>Returns an $emi-id that is available.
+Returns an $emi-id or -1 on failure.</p>
+</dd>
+<dt><strong><a name="discover_emis" class="item">$test_session-&gt;<code>discover_emis()</code></a></strong></dt>
+
+<dd>
+<p>Returns an array with all available emis.
+Returns -1 on failure.</p>
+</dd>
+<dt><strong><a name="download_euca_image" class="item">$test_session-&gt;download_euca_image($base_url, $image_tarball)</a></strong></dt>
+
+<dd>
+<p>Downloads the euca- packaged image from $base_url/$image_tarball then untars the bundle. 
+Returns the directory of the untared bundle or -1 on failure.</p>
+</dd>
+<dt><strong><a name="download_keypair" class="item">$test_session-&gt;<code>download_keypair($keypairname)</code></a></strong></dt>
+
+<dd>
+<p>Sends the local machines id_rsa.pub to the calling devices authorized_keys, then scps over the keyfile to the localhost as ~/$keypairname.priv .
+Returns the $keypairname  or -1 on failure.</p>
+</dd>
+<dt><strong><a name="get_cred" class="item">$test_session-&gt;get_cred( $account, $user[, $cred_dir])</a></strong></dt>
+
+<dd>
+<p>Use euca_conf --get-credentials to download the credentials for $account $user, and store them in $cred_dir. If $cred_dir is not provided then it will be placed in the eucarc-$account-$user directory.
+Can only be used on CLC. 
+Returns the $cred_dir  or -1 on failure.</p>
 </dd>
 </dl>
 <p>

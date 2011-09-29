@@ -4,7 +4,6 @@ EucaTest - Perl extension for Testing Eucalyptus on the QA infrastructure
 
 =head1 SYNOPSIS
 
-use EucaTest
 This module is intended to act on an Eucalyptus installation using euca2ools that are installed either locally or on a remote host. Both basic building blocks (ie running an arbitrary command on the remote machine) and high level test constructs (ie runnning an instance) are presented to allow test designers the highest level of flexibilty 
 
 =head1 METHODS
@@ -18,10 +17,12 @@ Methods are broken down into Constructor, Test Helpers, Eucalyptus Operatons, Eu
 =item new( %OPTS )
 
 Creates and returns a new EucaTest object. 
+
 [LOCAL CONNECTION]
-When no arguments are passed in the opts hash the default behavior is to start a local session.
+When no host argument is passed in the opts hash the default behavior is to start a local session.
+
 [REMOTE CONNECTION]
-In order to connect to a remote host the 'host' value must be passed in as follows: EucaTest->new({ host => "root:foobar\@myserver.org"})
+In order to connect to a remote host the 'host' value must be passed in as follows: EucaTest->new({ host => "root:foobar\@myserver.org"}). The password is optional if pub keys have been exchanged otherwise one can use a private key path in the keypath option.
 
 Other optional parameters to pass in the %OPTS hash:
 keypath=> this expects the path to a local private key file to use to authenticate the remote ssh session 
@@ -75,6 +76,16 @@ If testcase_id and testplan_id are provided then it updates testlink with the ru
 
 Set the running_log of the EucaTest instance to ""
 
+=item $test_session->found($command, qr/regex/)
+
+Executes the $command then does a multiline search for /regex/. 
+Returns 1 if the regex is found 0 if it is not.
+
+=item $test_session->get_fail_count()
+
+Returns the number of times the fail method was called in this session;
+
+
 =back
 
 =head2 Eucalyptus Operations
@@ -121,6 +132,57 @@ Returns the 0 on success and -1 on failure
 
 Deletes a security group.
 Returns the $groupname on success and -1 on failure
+
+=item $test_session->delete_keypair($keypair)
+
+Deletes the keypair and the file found at $keypair.priv.
+Returns the $keypair on success and -1 on failure
+
+=item $test_session->delete_snapshot($snapid)
+
+Deletes the snapshot $snapid.
+Returns the $snapid on success and -1 on failure
+
+=item $test_session->delete_volume($volumeid)
+
+Deletes the volume $volumeid.
+Returns the $volumeid on success and -1 on failure
+
+=item $test_session->deregister_image($imageid)
+
+Deregister the image $imageid.Make sure it shows as deregistered then deregister again and make sure its gone.
+Returns the $imageid on success and -1 on failure
+
+=item $test_session->detach_volume($volumeid)
+
+Detaches the volume $volumeid ensures that it returns the $volumeid then waits 5 seconds and checks again for the volume to be available.
+Returns the $volumeid on success and -1 on failure
+
+=item $test_session->get_emi()
+
+Returns an $emi-id that is available.
+Returns an $emi-id or -1 on failure.
+
+=item $test_session->discover_emis()
+
+Returns an array with all available emis.
+Returns -1 on failure.
+
+=item $test_session->download_euca_image($base_url, $image_tarball)
+
+Downloads the euca- packaged image from $base_url/$image_tarball then untars the bundle. 
+Returns the directory of the untared bundle or -1 on failure.
+
+=item $test_session->download_keypair($keypairname)
+
+Sends the local machines id_rsa.pub to the calling devices authorized_keys, then scps over the keyfile to the localhost as ~/$keypairname.priv .
+Returns the $keypairname  or -1 on failure.
+
+=item $test_session->get_cred( $account, $user[, $cred_dir])
+
+Use euca_conf --get-credentials to download the credentials for $account $user, and store them in $cred_dir. If $cred_dir is not provided then it will be placed in the eucarc-$account-$user directory.
+Can only be used on CLC. 
+Returns the $cred_dir  or -1 on failure.
 
 =back
 

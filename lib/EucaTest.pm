@@ -240,7 +240,7 @@ sub download_keypair{
 	$self->sys("echo \'@rsa_pub\' >> ~/.ssh/authorized_keys");
 	my $cmd = "scp root\@$CLC_INFO->{'QA_IP'}:$keypair.priv .";
 	my $keypair_text = `$cmd`;
-	return $keypair_text;
+	return $keypair;
 	
 }
 sub cleanup{
@@ -640,7 +640,7 @@ sub get_cred {
   
    if( !$self->found("ls $cred_dir", qr/euca.zip/)){
 		$self->fail("Unable to make credentials");
-		return -1;
+		exit(0);
 	}
   
   ##Change to that directory and unzip the credentials
@@ -649,6 +649,8 @@ sub get_cred {
   return "$cred_dir";
 }
 
+
+### UNDOCUMENTED API
 sub download_cred{
 	my $self = shift;
 	my $create_dir = `mkdir $self->{CREDPATH}`;
@@ -657,6 +659,7 @@ sub download_cred{
 	return $self->{CREDPATH};
 }
 
+## UNDOCUMENTED API
 sub send_cred{
 	my $self = shift;
 	my $host = shift;
@@ -884,7 +887,7 @@ sub discover_emis {
     my $self = shift;
    
     my $cmd = "$self->{TOOLKIT}describe-images";
-    my ($crc, $rc, $buf) = piperun($cmd, "grep IMAGE | grep -i 'mi-' | awk '{print \$2}'", "$ofile");
+    my ($crc, $rc, $buf) = piperun($cmd, "grep IMAGE | grep -i 'mi-' | grep available | awk '{print \$2}'", "$ofile");
     if ($rc) {
 		$self->fail("Failed in running describe images when trying to discover EMIs");
 		return -1;
@@ -1193,7 +1196,7 @@ sub get_instance_info{
 			return -1;
 		}else{
 			my @info = split(' ', $running[0]);
-			### Returns ($emi, $ip, $state);
+			### Returns ($emi, $ip, $state,);
 			return ($info[2], $info[3], $info[5], $info[6]);
 		}
 }
