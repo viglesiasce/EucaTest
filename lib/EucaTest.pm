@@ -640,7 +640,7 @@ sub get_cred {
   
    if( !$self->found("ls $cred_dir", qr/euca.zip/)){
 		$self->fail("Unable to make credentials");
-		exit(1);
+		return -1;
 	}
   
   ##Change to that directory and unzip the credentials
