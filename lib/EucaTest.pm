@@ -398,7 +398,7 @@ sub update_testlink{
  			print "Could not update testcase in testplan";
  			return -1;
  		}
- 		
+ 		my @rm_resp = $self->sys("ssh root\@192.168.51.187 -o StrictHostKeyChecking=no \'rm artifacts/$run_file \'");
  	   ##UPLOADING THE TC RESULT WILL RETURN ME THE EXEC ID
  		
  		
@@ -432,7 +432,7 @@ sub attach_artifacts{
 	}
 	
 	##DELETE ARTICACTS AFTER UPLOAD
-	my @remove_artifacts = $self->sys("ssh root\@192.168.51.187 -o StrictHostKeyChecking=no \'rm -rf artifacts/$exec_id/*\'");
+	my @remove_artifacts = $self->sys("ssh root\@192.168.51.187 -o StrictHostKeyChecking=no \'rm -rf artifacts/$exec_id\'");
 	return 0;
 }
 
@@ -570,7 +570,7 @@ sub read_input_file{
 				$CONFIG{'QA_SOURCE'} = $qa_source;
 				$CONFIG{'QA_ROLL'} = $qa_roll;
 				$CONFIG{'QA_IP'} = $qa_ip;
-					print "IP $qa_ip [CLC Distro: $qa_distro CLC Version: $qa_distro_ver CLC ARCH $qa_arch] is built from $qa_source as Eucalyptus-$qa_roll\n";
+				print "IP $qa_ip [CLC Distro: $qa_distro CLC Version: $qa_distro_ver CLC ARCH $qa_arch] is built from $qa_source as Eucalyptus-$qa_roll\n";
 			}elsif( $this_roll =~ /nc/ ){
 				
 				$CONFIG{'NODE_DISTRO'} = $qa_distro;
