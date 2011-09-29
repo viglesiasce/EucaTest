@@ -366,7 +366,7 @@ sub update_testlink{
  			open FAIL, "<$filename" or die $!;
  			my @fail_file = <FAIL>;
  			close(FAIL);
- 			unshift(@running_log,"Failed file Exists!\n@fail_file\n");
+ 			unshift(@running_log,"<font color=\"red\" size=\"4\">Failed file Exists!\n@fail_file\n</font>");
  		}
  		chomp($tc_id);
  		my $run_file = "run-$tc_id-" . time() .".log";
@@ -640,7 +640,7 @@ sub get_cred {
   
    if( !$self->found("ls $cred_dir", qr/euca.zip/)){
 		$self->fail("Unable to make credentials");
-		exit(0);
+		exit(1);
 	}
   
   ##Change to that directory and unzip the credentials
@@ -1076,7 +1076,7 @@ sub run_instance{
 	    $self->add_group($group );
 		
 	}
-	my $address = $self->allocate_address();
+	#my $address = $self->allocate_address();
 	my $emi = $self->get_emi();
 #	my $keypath =$self->add_keypair($keypair);
 #	$self->add_group($group);
