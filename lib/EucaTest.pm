@@ -584,7 +584,10 @@ sub read_input_file{
 			$is_memo = 0;
 		};
 	};	
-
+	if( $CONFIG{'QA_SOURCE'} =~ /repo/i){
+		$self->{EUCALYPTUS} = "/";
+	}
+	
 	close(INPUT);
 
 	$CONFIG{'QA_MEMO'} = $memo;
