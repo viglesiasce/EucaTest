@@ -357,7 +357,7 @@ sub update_testlink{
  			open FAIL, "<$filename" or die $!;
  			my @fail_file = <FAIL>;
  			close(FAIL);
- 			unshift(@running_log,"<font color=\"red\" size=\"4\">@fail_file\n</font>");
+ 			unshift(@running_log,"<font color=\"red\" size=\"4\">@fail_file</font><br>");
  		}
  		chomp($tc_id);
  		my $run_file = "run-$tc_id-" . time() .".log";
