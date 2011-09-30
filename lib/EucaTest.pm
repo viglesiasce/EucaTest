@@ -28,8 +28,6 @@ our @EXPORT = qw(
 );
 
 our $VERSION = '0.01';
-my $exit_on_fail = 1;
-
 our $ofile = "ubero";
 my $CLC_INFO = {};
 my @running_log;
@@ -94,11 +92,8 @@ sub new{
 	if( !defined $toolkit){
 		$toolkit = "euca-";
 	}
-	$exit_on_fail = $opts->{'exit_on_fail'};	
-	if( !defined $exit_on_fail){
-		$exit_on_fail = 1;
-	}
-	my $self  = { SSH => $ssh , CREDPATH => $credpath, TIMEOUT => $timeout, EUCALYPTUS => $eucadir,  VERIFY_LEVEL=> $verify_level, TOOLKIT => $toolkit, DELAY => $delay, EXIT_ON_FAIL => $exit_on_fail, FAIL_COUNT=> $fail_count};
+	
+	my $self  = { SSH => $ssh , CREDPATH => $credpath, TIMEOUT => $timeout, EUCALYPTUS => $eucadir,  VERIFY_LEVEL=> $verify_level, TOOLKIT => $toolkit, DELAY => $delay, FAIL_COUNT=> $fail_count};
 	bless $self;
 	
 	if( defined $ssh && $self->get_credpath eq ""){
@@ -117,15 +112,11 @@ sub new{
 sub fail {
   my $self = shift;
   my $message = shift;
-  #if (ref($message) eq "EucaTest") {
-	#$message = shift;
-	#}
+
   push(@running_log, "^^^^^^[TEST_REPORT] FAILED $message^^^^^^\n");
   print("^^^^^^[TEST_REPORT] FAILED $message^^^^^^\n");
   $self->{FAIL_COUNT}++;
-  #if (0){
-  #	exit(1);
-  #}
+ 
   return 0;
 }
 
@@ -357,7 +348,7 @@ sub update_testlink{
  			$line =~ s/\n/<br>/g;
  			
  		}
- 		#unshift(@running_log ,$CLC_INFO->{"INPUT_FILE"} );
+ 		unshift(@running_log ,$CLC_INFO->{"INPUT_FILE"} );
  		##
  		### CHECK FOR test.fail file in status directory
  		my $filename = "../status/test.failed";
@@ -629,7 +620,7 @@ sub get_cred {
   if(!defined $cred_dir){
   	 $cred_dir = "eucarc-$account-$user";
   }
- 
+  $self->sys("rm -rf " . $cred_dir);
   $self->sys("mkdir " . $cred_dir);
   
   if( !$self->found("ls", qr/$cred_dir/)){
