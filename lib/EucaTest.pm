@@ -266,7 +266,7 @@ sub update_testlink{
  			$status= "p";
  		}
 	}
-	 
+	 	
  		
  		my $notes ="";
  		my $platform = 1;
@@ -334,6 +334,9 @@ sub update_testlink{
  		}
  		$CLC_INFO->{"INPUT_FILE"} = "##################### TEST SETUP #####################\n" . $CLC_INFO->{"INPUT_FILE"} . "\n\n\n##################### TEST OUTPUT #####################\n";
  		
+ 		
+ 		
+ 		### DETERMINE TEST STATUS
  		### Remove \n and replace with HTML newline character <br>
  		
  		foreach my $line (@running_log){
@@ -369,10 +372,17 @@ sub update_testlink{
  		
  		
  		### IF a different testplan is in the memo update that one
+ 		### else if the branch is not eee then put it into the NON-EEE testplan
+ 		my @branch_url = split(/\//,$CLC_INFO->{'BZR_BRANCH'});
+ 		my $branch_name = @branch_url[ @branch_url - 1 ];
  		if ( defined $CLC_INFO->{"TESTPLAN_ID"} ){
  			$tplan_id = $CLC_INFO->{"TESTPLAN_ID"};
  			$tplan_id =~ s/[^\w\d]//g;
+ 		}elsif( $branch_name  ne "eee"){
+ 			$tplan_id = 380;
  		}
+ 		
+ 		### GET REVNO AND SOURCE INFO
  		$build = "other";
  		if ( $CLC_INFO->{'QA_SOURCE'} =~ /repo/i){
  			$build =  "REPO " . $CLC_INFO->{'BZR_REVISION'};
@@ -381,6 +391,8 @@ sub update_testlink{
  		}
  		chomp($tplan_id);
  		
+ 		
+ 		#################################
  		my @build_response = $self->sys("ssh root\@192.168.51.187 -o StrictHostKeyChecking=no \'./testlink/update_build.pl testplanid=$tplan_id \"$build\"'");
  		my $build_id = $build_response[0];
  		chomp($build_id);
