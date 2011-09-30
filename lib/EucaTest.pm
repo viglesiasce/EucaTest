@@ -384,10 +384,8 @@ sub update_testlink{
  		
  		### GET REVNO AND SOURCE INFO
  		$build = "other";
- 		if ( $CLC_INFO->{'QA_SOURCE'} =~ /repo/i){
- 			$build =  "REPO " . $CLC_INFO->{'BZR_REVISION'};
- 		}else{
- 				$build = "BZR " . $CLC_INFO->{'BZR_REVISION'};
+ 		if ( defined $CLC_INFO->{'BZR_REVISION'} ){
+ 			$build =  "BZR " . $CLC_INFO->{'BZR_REVISION'};
  		}
  		chomp($tplan_id);
  		
