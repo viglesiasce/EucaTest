@@ -390,18 +390,18 @@ sub update_testlink{
  			if( @branch_url[ @branch_url - 2 ] eq "triggers"){
  				### IF THIS IS FROM REPO MAKE IT REPO 
  				if( $CLC_INFO->{'QA_SOURCE'} =~ /repo/){
- 					$build =  "GA REPO";
+ 					$build =  "$branch_name GA REPO";
  				}else{
- 					$build =  "GA SRC";
+ 					$build =  "$branch_name GA SRC";
  				}
  				
  			}
  			### OTHERWISE THIS IS A NON TRIGGERED TEST SO JUST CALL IT BY ITS REVNO 
  			else{
  				if( $CLC_INFO->{'QA_SOURCE'} =~ /repo/){
- 					$build =  "REPO " . $CLC_INFO->{'BZR_REVISION'};
+ 					$build =  "$branch_name REPO " . $CLC_INFO->{'BZR_REVISION'};
  				}else{
- 					$build =  "BZR " . $CLC_INFO->{'BZR_REVISION'};
+ 					$build =  "$branch_name BZR " . $CLC_INFO->{'BZR_REVISION'};
  				}
  				
  			}
