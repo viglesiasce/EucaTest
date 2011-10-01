@@ -379,14 +379,37 @@ sub update_testlink{
  			$tplan_id = $CLC_INFO->{"TESTPLAN_ID"};
  			$tplan_id =~ s/[^\w\d]//g;
  		}elsif( $branch_name  ne "eee"){
+ 			### THIS MAPS TO THE NON-EEE TESTPLAN IN TESTLINK
  			$tplan_id = 380;
  		}
  		
- 		### GET REVNO AND SOURCE INFO
+ 		### DECIDE WHAT TO CALL THE BUILD
  		$build = "other";
  		if ( defined $CLC_INFO->{'BZR_REVISION'} ){
- 			$build =  "BZR " . $CLC_INFO->{'BZR_REVISION'};
+ 			## IF THE SECOND TO LAST ELEMENT IN THE PATH TRIGGERS THEN THIS IS A GA TRIGGERED TEST
+ 			if( @branch_url[ @branch_url - 2 ] eq "triggers"){
+ 				### IF THIS IS FROM REPO MAKE IT REPO 
+ 				if( $CLC_INFO->{'QA_SOURCE'} =~ /repo/){
+ 					$build =  "GA REPO";
+ 				}else{
+ 					$build =  "GA SRC";
+ 				}
+ 				
+ 			}
+ 			### OTHERWISE THIS IS A NON TRIGGERED TEST SO JUST CALL IT BY ITS REVNO 
+ 			else{
+ 				if( $CLC_INFO->{'QA_SOURCE'} =~ /repo/){
+ 					$build =  "REPO " . $CLC_INFO->{'BZR_REVISION'};
+ 				}else{
+ 					$build =  "BZR " . $CLC_INFO->{'BZR_REVISION'};
+ 				}
+ 				
+ 			}
+ 		}else{
+ 			print "No REVNO found so not updating testlink, talk to Vic";
+ 			return -1;
  		}
+ 		
  		chomp($tplan_id);
  		
  		
