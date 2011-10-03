@@ -414,6 +414,7 @@ sub update_testlink{
  		
  		
  		#################################
+ 		my @mkdir_artifacts_response = $self->sys("ssh root\@192.168.51.187 -o StrictHostKeyChecking=no \'mkdir artifacts\'");
  		my @build_response = $self->sys("ssh root\@192.168.51.187 -o StrictHostKeyChecking=no \'./testlink/update_build.pl testplanid=$tplan_id \"$build\"'");
  		my $build_id = $build_response[0];
  		chomp($build_id);
@@ -440,7 +441,8 @@ sub attach_artifacts{
 	} 
 	chomp $exec_id;
 	## SEND THE ARTIFACTS TO THE REMOTE MACHINE
-	my @mkdir_response = $self->sys("ssh root\@192.168.51.187 -o StrictHostKeyChecking=no \'mkdir artifacts/$exec_id\'");
+	
+	my @mkdir_execid_response = $self->sys("ssh root\@192.168.51.187 -o StrictHostKeyChecking=no \'mkdir artifacts/$exec_id\'");
 	my @scp_artifacts_result = `scp ../artifacts/*.out root\@192.168.51.187:artifacts/$exec_id`;
  	
 	
