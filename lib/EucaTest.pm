@@ -378,30 +378,33 @@ sub update_testlink{
  		if ( defined $CLC_INFO->{"TESTPLAN_ID"} ){
  			$tplan_id = $CLC_INFO->{"TESTPLAN_ID"};
  			$tplan_id =~ s/[^\w\d]//g;
- 		}elsif( $CLC_INFO->{"TESTPLAN_ID"} !~ /GA-/){
+ 		}elsif( $CLC_INFO->{"TEST_NAME"} !~ /GA-/){
  			### THIS MAPS TO THE NON-EEE TESTPLAN IN TESTLINK
  			$tplan_id = 380;
  		}
  		
  		### DECIDE WHAT TO CALL THE BUILD
  		$build = "other";
- 		if ( defined $CLC_INFO->{'BZR_REVISION'} ){
- 			## IF THE SECOND TO LAST ELEMENT IN THE PATH TRIGGERS THEN THIS IS A GA TRIGGERED TEST
- 			if( @branch_url[ @branch_url - 2 ] eq "triggers"){
+ 		
+ 		### MAKE SURE I HAVE A REVNO OF SOME SORT
+ 		if ( defined $CLC_INFO->{'BZR_REVISION'} ) {
+ 			
+ 			## IF THIS IS A GA TRIGGERED TEST
+ 			if(  $CLC_INFO->{"TEST_NAME"} =~ /GA-/i){
  				### IF THIS IS FROM REPO MAKE IT REPO 
- 				if( $CLC_INFO->{'QA_SOURCE'} =~ /repo/){
+ 				if( $CLC_INFO->{'QA_SOURCE'} =~ /repo/i){
  					$build =  "$branch_name GA REPO";
  				}else{
- 					$build =  "$branch_name GA SRC";
+ 					$build =  "$branch_name GA SRC " .  $CLC_INFO->{'BZR_REVISION'};
  				}
  				
  			}
- 			### OTHERWISE THIS IS A NON TRIGGERED TEST SO JUST CALL IT BY ITS REVNO 
+ 			### OTHERWISE THIS IS A NON TRIGGERED TEST SO JUST CALL IT BY ITS BRANCH NAME and REVNO 
  			else{
- 				if( $CLC_INFO->{'QA_SOURCE'} =~ /repo/){
+ 				if( $CLC_INFO->{'QA_SOURCE'} =~ /repo/i){
  					$build =  "$branch_name REPO " . $CLC_INFO->{'BZR_REVISION'};
  				}else{
- 					$build =  "$branch_name BZR " . $CLC_INFO->{'BZR_REVISION'};
+ 					$build =  "$branch_name SRC " . $CLC_INFO->{'BZR_REVISION'};
  				}
  				
  			}
