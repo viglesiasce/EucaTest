@@ -378,7 +378,7 @@ sub update_testlink{
  		if ( defined $CLC_INFO->{"TESTPLAN_ID"} ){
  			$tplan_id = $CLC_INFO->{"TESTPLAN_ID"};
  			$tplan_id =~ s/[^\w\d]//g;
- 		}elsif( $branch_name  ne "eee"){
+ 		}elsif( $CLC_INFO->{"TESTPLAN_ID"} !~ /GA-/){
  			### THIS MAPS TO THE NON-EEE TESTPLAN IN TESTLINK
  			$tplan_id = 380;
  		}
@@ -441,7 +441,7 @@ sub attach_artifacts{
 	} 
 	chomp $exec_id;
 	## SEND THE ARTIFACTS TO THE REMOTE MACHINE
-	
+	my @mkdir_artifacts_response = $self->sys("ssh root\@192.168.51.187 -o StrictHostKeyChecking=no \'mkdir artifacts\'");
 	my @mkdir_execid_response = $self->sys("ssh root\@192.168.51.187 -o StrictHostKeyChecking=no \'mkdir artifacts/$exec_id\'");
 	my @scp_artifacts_result = `scp ../artifacts/*.out root\@192.168.51.187:artifacts/$exec_id`;
  	
