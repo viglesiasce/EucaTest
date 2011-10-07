@@ -51,11 +51,11 @@ sub new{
 		## are we authenticating with keys or with password alone
 		if( defined $keypath){
 			chomp $keypath;
-			 $self->test_name("Creating a keypair authenticated SSH connection to $host");
+#			 $self->test_name("Creating a keypair authenticated SSH connection to $host");
 			$ssh =  Net::OpenSSH->new( $host, key_path => $keypath ,  master_opts => [-o => "StrictHostKeyChecking=no" ]  );
 			print $ssh->error;
 		}else{
-			$self->test_name( "Creating a password authenticated SSH connection to $host");
+#			$self->test_name( "Creating a password authenticated SSH connection to $host");
 			$ssh =  Net::OpenSSH->new($host,  master_opts => [-o => "StrictHostKeyChecking=no" ] );
 			print $ssh->error;
 		}
