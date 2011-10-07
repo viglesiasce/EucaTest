@@ -51,11 +51,11 @@ sub new{
 		## are we authenticating with keys or with password alone
 		if( defined $keypath){
 			chomp $keypath;
-			 test_name("Creating a keypair authenticated SSH connection to $host");
+			 $self->test_name("Creating a keypair authenticated SSH connection to $host");
 			$ssh =  Net::OpenSSH->new( $host, key_path => $keypath ,  master_opts => [-o => "StrictHostKeyChecking=no" ]  );
 			print $ssh->error;
 		}else{
-			test_name( "Creating a password authenticated SSH connection to $host");
+			$self->test_name( "Creating a password authenticated SSH connection to $host");
 			$ssh =  Net::OpenSSH->new($host,  master_opts => [-o => "StrictHostKeyChecking=no" ] );
 			print $ssh->error;
 		}
@@ -133,7 +133,9 @@ sub pass {
 
 # Print test case name (ie a description of the following steps)
 sub test_name {
-  my($name) = @_;
+  my $self = shift;
+  my $name = shift;
+
   push(@running_log, "******[TEST_REPORT] ACTION - $name ******\n");
   print("******[TEST_REPORT] ACTION - $name ******\n");
 }
@@ -1036,7 +1038,7 @@ sub upload_euca_image{
 sub deregister_image{
 	my $self = shift;
 	my $image = shift;
-	test_name("Deregistering image $image");
+	$self->test_name("Deregistering image $image");
 	
 	## Execute deregister command
 	my @dereg1 = $self->sys("$self->{TOOLKIT}deregister $image");
@@ -1120,7 +1122,7 @@ sub run_instance{
 	
 	my $emi = $self->get_emi();
 
-	test_name("Sending run instance command");
+	$self->test_name("Sending run instance command");
 	my $base_command = "$self->{TOOLKIT}run-instances -g $group -k $keypair  $emi";
 	my @flags = ();
 	
@@ -1143,7 +1145,7 @@ sub run_instance{
 		my $instance_id = $instance_line_breakout[1];
 		
 		### Waiting for 20s 
-		test_name("Sleeping 20 seconds for instance to get its IP");
+		$self->test_name("Sleeping 20 seconds for instance to get its IP");
 		sleep 20;
 		$inst_hash = $self->get_instance_info($instance_id);
 		## If emi- is found then we can assume we have the rest of the info as well
@@ -1164,7 +1166,7 @@ sub run_instance{
 		my $period = 20;
 		my $count = 0;
 		while ( ($inst_hash->{'state'}  eq "pending") && ($count < 15) ){
-			test_name("Polling every 20s until instance in running state");
+			$self->test_name("Polling every 20s until instance in running state");
 			sleep $period;
 			
 			$inst_hash = $self->get_instance_info($instance_id);
@@ -1467,7 +1469,7 @@ sub create_snapshot{
         			my @snapshot_info = split(/ /,$snapshot_poll[0] );
         			my @new_percentage = split (/%/,$snapshot_info[5]);
         			if( $new_percentage[0] > $old_percentage){
-        				test_name("Snapshot went from $old_percentage to $new_percentage[0]");
+        				$self->test_name("Snapshot went from $old_percentage to $new_percentage[0]");
         				$old_percentage = $new_percentage[0];
         				$current_state = $snapshot_info[3] ;
         				$poll_count--;
@@ -1626,7 +1628,7 @@ sub euare_add_userinfo{
 	my $key = shift;
 	my $value = shift;
 	
-	test_name("Update $user info: $key=$value");
+	$self->test_name("Update $user info: $key=$value");
 	$self->sys("euare-userupdateinfo -u $user -k $key -i $value");
 	if (!$self->found("euare-usergetinfo -u $user", qr/$key\s+$value/)) {
   		$self->fail("failed to add user info");
@@ -1679,7 +1681,7 @@ sub euare_add_userkey{
 	  $self->fail("failed to get user key");
 	  return -1;
 	}
-	test_name("Check that key is active");
+	$self->test_name("Check that key is active");
 	if (!$self->found("euare-userlistkeys -u $user", qr/Active/)) {
 	  $self->fail("wrong user key status");
 	  return -1;
@@ -1692,7 +1694,7 @@ sub euare_deactivate_key{
 	my $self= shift;
 	my $user = shift;
 	my $key = shift;
-	test_name("Deactivate the key");
+	$self->test_name("Deactivate the key");
 	$self->sys("euare-usermodkey -u $user -k $key -s Inactive");
 	if (!$self->found("euare-userlistkeys -u $user", qr/Inactive/)) {
  	 $self->fail("wrong user key status");
@@ -1706,7 +1708,7 @@ sub euare_delete_key{
 	my $user = shift;
 	my $key = shift;
 	
-	test_name("Delete the key");
+	$self->test_name("Delete the key");
 	$self->sys("euare-userdelkey -u $user -k $key");
 	if ($self->found("euare-userlistkeys -u $user", qr/$key/)) {
  		$self->fail("failed to delete user key");
@@ -1721,7 +1723,7 @@ sub euare_create_cert{
 	my $user = shift;
 	
 	
-	test_name("create user certificate");
+	$self->test_name("create user certificate");
 	$self->sys("euare-usercreatecert -u $user");
 	my @res = $self->sys("euare-userlistcerts -u $user");
 	if (@res < 1) {
@@ -1730,13 +1732,13 @@ sub euare_create_cert{
 	}
 	my $cert = $res[0];
 	chomp($cert);
-	test_name("Check that certificate exists");
+	$self->test_name("Check that certificate exists");
 	if (!$self->found("euare-userlistcerts -u $user", qr/$cert/)) {
   		$self->fail("failed to get user cert");
   		return -1;
 	}
 
-	test_name("Check that cert is active");
+	$self->test_name("Check that cert is active");
 	if (!$self->found("euare-userlistcerts -u $user", qr/Active/)) {
   		$self->fail("wrong user cert status");
   		return -1;
@@ -1749,7 +1751,7 @@ sub euare_deactviate_cert{
 	my $user = shift;
 	my $cert = shift;
 	
-	test_name("Deactivate Cert");
+	$self->test_name("Deactivate Cert");
 	$self->sys("euare-usermodcert -u $user -c $cert -s Inactive");
 	if (!$self->found("euare-userlistcerts -u $user", qr/Inactive/)) {
   		$self->fail("wrong user cert status");
@@ -1763,7 +1765,7 @@ sub euare_delete_cert{
 	my $self = shift;
 	my $user = shift;
 	my $cert = shift;
-	test_name("Delete cert");
+	$self->test_name("Delete cert");
 	$self->sys("euare-userdelcert -u $user -c $cert");
 	if ($self->found("euare-userlistcerts -u $user", qr/$cert/)) {
   		$self->fail("failed to delete user cert");
@@ -1776,20 +1778,20 @@ sub euare_add_certfromfile{
 	my $user = shift;
 	my $filename = shift;
 	
-	test_name("Add user certificate from file");
+	$self->test_name("Add user certificate from file");
 	my @res = $self->sys("euare-useraddcert -u $user -f $filename");
 	my $cert = $res[0];
 	chomp($cert);
 
 	sleep(5);
 
-	test_name("Check that certificate exists");
+	$self->test_name("Check that certificate exists");
 	if (!$self->found("euare-userlistcerts -u $user", qr/$cert/)) {
 	  $self->fail("failed to get user cert");
 	  return -1;
 	}
 
-	test_name("Check that cert is active");
+	$self->test_name("Check that cert is active");
 	if (!$self->found("euare-userlistcerts -u $user", qr/Active/)) {
 	  $self->fail("wrong user cert status");
 	  return -1;
