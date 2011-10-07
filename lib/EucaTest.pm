@@ -122,9 +122,12 @@ sub fail {
 
 # Print formatted success message
 sub pass {
-  my($message) = @_;
+  my $self = shift;
+  my $message = shift;
+
   push(@running_log, "^^^^^^[TEST_REPORT] PASSED - $message^^^^^^\n\n");
   print("^^^^^^[TEST_REPORT] PASSED - $message^^^^^^\n\n");
+  
   return 0;
 }
 
@@ -712,7 +715,7 @@ sub add_keypair{
  		
  		my @KEYFILE = $self->sys("cat $filepath");
  		if( $KEYFILE[0] =~ /BEGIN RSA PRIVATE KEY/ ){
- 			pass("Correctly added keypair $keyname");
+ 			$self->pass("Correctly added keypair $keyname");
  			$self->sys("chmod 0600 $filepath");
  			return $keyname;
  		}
@@ -749,7 +752,7 @@ sub delete_keypair{
 			#ENSURE THE KEYPAIR NO LONGER EXISTS
 			
 			if( !$self->found("$self->{TOOLKIT}describe-keypairs", qr/$keyname/) ){
-				pass("Deleted keypair $keyname");
+				$self->pass("Deleted keypair $keyname");
 				$self->sys("rm -f $filepath");
 				return $keyname;
 			}else{
@@ -797,14 +800,14 @@ sub add_group{
 	if( @desc_groups < 1){
 		my @add_group = $self->sys("$self->{TOOLKIT}add-group $groupname -d $groupname");
 		if($add_group[0] =~ /GROUP/){
-			pass("Added group $groupname successfully");
+			$self->pass("Added group $groupname successfully");
 		}
 		else{ 
 			$self->fail("Unable to add group $groupname");
 			return -1;
 		}
 	}else{
-		pass("Group $groupname already exists not creating");
+		$self->pass("Group $groupname already exists not creating");
 	}
 	
 	
@@ -814,7 +817,7 @@ sub add_group{
 		
 		my @auth_icmp = $self->sys("$self->{TOOLKIT}authorize $groupname -P icmp");
 		if($auth_icmp[0] =~ /GROUP/){
-			pass("Added ICMP authorization for $groupname successfully");
+			$self->pass("Added ICMP authorization for $groupname successfully");
 		}
 		else{ 
 			$self->fail("Unable authorize group $groupname for ICMP");
@@ -823,7 +826,7 @@ sub add_group{
 		
 		my @auth_ssh  = $self->sys("$self->{TOOLKIT}authorize $groupname -p 22");
 		if($auth_ssh[0] =~ /GROUP/){
-			pass("Added SSH authorization for $groupname successfully");
+			$self->pass("Added SSH authorization for $groupname successfully");
 		}
 		else{ 
 			$self->fail("Unable authorize group $groupname for SSH");
@@ -832,7 +835,7 @@ sub add_group{
 	}else{
 		my @auth_rule = $self->sys("$self->{TOOLKIT}authorize $groupname $rule");
 		if($auth_rule[0] =~ /GROUP/){
-			pass("Added $rule authorization for $groupname successfully");
+			$self->pass("Added $rule authorization for $groupname successfully");
 		}
 		else{ 
 			$self->fail("Unable authorize group $groupname for $rule");
@@ -850,7 +853,7 @@ sub delete_group{
 	my $ip = shift;
 	my @add_group = $self->sys("$self->{TOOLKIT}delete-group $groupname");
 	if($add_group[0] =~ /GROUP/){
-		pass("Deleted group $groupname successfully");
+		$self->pass("Deleted group $groupname successfully");
 		return $groupname;
 	}
 	else{ 
@@ -864,7 +867,7 @@ sub allocate_address{
 	my @output = $self->sys("$self->{TOOLKIT}allocate-address");
 	if($output[0] =~ /ADDRESS/){
 		my @ip = split(' ', $output[0]);
-		pass("Address $ip[1] allocated");
+		$self->pass("Address $ip[1] allocated");
 		return $ip[1];
 	}
 	else{
@@ -882,7 +885,7 @@ sub release_address{
 	if($output[0] =~ /ADDRESS/){
 		my @ip = split(' ', $output[0]);
 		if( $ip[1] =~ $address){
-			pass("Address $ip[1] released");
+			$self->pass("Address $ip[1] released");
 			return $ip[1];
 		}
 		else{
@@ -910,7 +913,7 @@ sub get_emi{
 	}
 	if($output[0] =~ /emi/){
 		my @emi = split(' ', $output[0] );
-		pass("Found EMI $emi[1]");
+		$self->pass("Found EMI $emi[1]");
 		return $emi[1];	
 	}
 	else{
@@ -1061,7 +1064,7 @@ sub deregister_image{
 					}else{
 						my @desc2 = $self->sys("$self->{TOOLKIT}describe-images | grep $image");
 						if( @desc2 < 1){
-							pass("Successfully deregistered image $image");
+							$self->pass("Successfully deregistered image $image");
 							my @image_info = split(/\s/,$desc1[0]);
 							my @bucket = split(/\//, $image_info[2]);
 							$self->delete_bundle("$bucket[0]");
@@ -1090,7 +1093,7 @@ sub delete_bundle{
 	my $bundle = shift;
 	my @deletebundle = $self->sys("$self->{TOOLKIT}delete-bundle --clear -b $bundle");
 	if( @deletebundle <1){
-		pass("Delete bundle seems to have succeeded");
+		$self->pass("Delete bundle seems to have succeeded");
 		return 0;
 	}else{
 		$self->fail("Output returned from delete-bundle\n@deletebundle");
@@ -1154,7 +1157,7 @@ sub run_instance{
 			return $inst_hash;
 		}
 		
-		pass("Instance $inst_hash->{'id'}  started with emi $inst_hash->{'emi'}  at $inst_hash->{'time'}  with IP= $inst_hash->{'pub-ip'} ");
+		$self->pass("Instance $inst_hash->{'id'}  started with emi $inst_hash->{'emi'}  at $inst_hash->{'time'}  with IP= $inst_hash->{'pub-ip'} ");
 		
 		
 		### Poll the instance every 20s for 300s until it leaves the pending state
@@ -1179,7 +1182,7 @@ sub run_instance{
 			return $inst_hash;
 		}else{
 			### Returns ($instance_id,  $emi, $ip, $state);
-			pass("Instance is now in $inst_hash->{'state'}  state after " . ( $count * $period ) . " seconds");
+			$self->pass("Instance is now in $inst_hash->{'state'}  state after " . ( $count * $period ) . " seconds");
 			return $inst_hash;
 		}
 		
@@ -1210,7 +1213,7 @@ sub terminate_instance{
 		}
 		my @instance = split(' ', $describe_instances[0]);
 		if($instance[5] =~ /terminated/){
-			pass("Successfully terminated instance $instance_id");
+			$self->pass("Successfully terminated instance $instance_id");
 			return $instance_id;
 		}
 		else{
@@ -1320,7 +1323,7 @@ sub reboot_instance{
 	sleep 80;
 	my @uptime_new = $self->sys("ssh root\@$ip -i $keypair.priv \"cat /proc/uptime | awk \'{print \$1}\'\"");
 	if( $uptime_old[0] > $uptime_new[0]) {
-		pass("Instance rebooted. Old uptime: $uptime_old[0]  New uptime:  $uptime_new[0]");
+		$self->pass("Instance rebooted. Old uptime: $uptime_old[0]  New uptime:  $uptime_new[0]");
 		return $instance_id;
 	}else{
 		$self->fail("Uptime is greater than before reboot. Must not have rebooted instance properly");
@@ -1368,7 +1371,7 @@ sub create_volume{
 			return -1;
 		}
 		else{
-			pass("Volume $vol_id[1] created properly");
+			$self->pass("Volume $vol_id[1] created properly");
 			return $vol_id[1];
 		}	
 	}
@@ -1449,7 +1452,7 @@ sub create_snapshot{
         	if( $create_output[0] =~ /^SNAPSHOT.*pending/){
         		my @snapshot_info = split(/ /,$create_output[0] );
         		my $snap_id = $snapshot_info[1];
-        		pass("Snapshot $snap_id being created and in pending state");
+        		$self->pass("Snapshot $snap_id being created and in pending state");
         		my $old_percentage = 0;
         		my $current_state = "pending";
         		
@@ -1477,7 +1480,7 @@ sub create_snapshot{
         		}
         		
         		if( $current_state eq "completed"){
-        			pass("Successfully created snapshot $snap_id");
+        			$self->pass("Successfully created snapshot $snap_id");
         			return $snap_id;
         		}else{
         			$self->fail("Snapshot creation failed");
@@ -1559,7 +1562,7 @@ sub euare_create_user{
   		$self->fail("could not create new user arn:aws:iam::$account:user$user_path$new_user");
   		return -1;
 	}
-	pass("Created new user arn:aws:iam::$account:user$user_path$new_user ");
+	$self->pass("Created new user arn:aws:iam::$account:user$user_path$new_user ");
 	return $new_user;
 }
 sub euare_delete_user{
@@ -1845,7 +1848,7 @@ sub modify_property {
 	if(!$self->found($cmd, qr/$property/)) {
                 $self->fail("modify property failed for $property=$value");
 	} else {
-		pass("set property $property to $value");
+		$self->pass("set property $property to $value");
 	}
 }
 
