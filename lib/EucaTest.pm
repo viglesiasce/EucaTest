@@ -6,7 +6,7 @@ use warnings;
 
 use Net::OpenSSH;
 require Exporter;
-#use Data::Dumper;
+use Data::Dumper;
 
 
 our @ISA = qw(Exporter);
@@ -736,6 +736,11 @@ sub delete_keypair{
 	my $keyname = shift;
 	my $filepath = "$keyname.priv";
 	my @output = $self->sys("$self->{TOOLKIT}delete-keypair $keyname");
+	
+	if( @output < 1){
+		$self->fail("Delete keypair command did not return anything");
+		return -1;
+	}
 	## Check the first line of output for KEYPAIR
 	if($output[0] =~ /KEYPAIR/){
 			
@@ -1100,6 +1105,7 @@ sub run_instance{
 	my $group = shift;
 	my $OPTS = shift;
 	my $time= time();
+	my $inst_hash = {};
 	if( !defined $keypair){
 		$keypair = $self->add_keypair("keypair-" . $time);
 	}
@@ -1108,80 +1114,80 @@ sub run_instance{
 	    $self->add_group($group );
 		
 	}
-	#my $address = $self->allocate_address();
+	
 	my $emi = $self->get_emi();
-#	my $keypath =$self->add_keypair($keypair);
-#	$self->add_group($group);
+
 	test_name("Sending run instance command");
 	my $base_command = "$self->{TOOLKIT}run-instances -g $group -k $keypair  $emi";
 	my @flags = ();
 	
-	my @output =  $self->sys($base_command);
-	if ( @output < 1){
+	my @run_output =  $self->sys($base_command);
+	if ( @run_output < 1){
 		$self->fail("Initial attempt at running instance returned nothing");
 		return -1;
 	}
 	
 	### There was output to the run instance command, check if it includes INSTANCE  
-	my @instance = grep(/INSTANCE/, @output);
-	if( @instance < 1){
-		$self->fail("Initial attempt at running instance returned:\n@output");
+	my @instance_output = grep(/INSTANCE/, @run_output);
+	if( @instance_output < 1){
+		$self->fail("Initial attempt at running instance returned:\n@run_output");
 		return -1;
 	}
 	
 	### Check for state pending of the INSTANCE right after the run instance command  
-	if ($instance[0] =~ /pending/){
-		my @instance = split(' ', $instance[0]);
-		my $instance_id = $instance[1];
+	if ($instance_output[0] =~ /pending/){
+		my @instance_line_breakout = split(' ', $instance_output[0]);
+		my $instance_id = $instance_line_breakout[1];
 		
 		### Waiting for 20s 
 		test_name("Sleeping 20 seconds for instance to get its IP");
 		sleep 20;
-		my ($emi, $ip, $state) = $self->get_instance_info($instance_id);
+		$inst_hash = $self->get_instance_info($instance_id);
 		## If emi- is found then we can assume we have the rest of the info as well
-		if ( $emi !~ /emi-/){
-			fail ("Could not find the instance in the describe instances pool after issuing run and waiting 20s");
-			return -1;
+		if ( $inst_hash->{'emi'} !~ /emi-/){
+			$self->fail ("Could not find the instance in the describe instances pool after issuing run and waiting 20s");
+			return $inst_hash;
 		}
 		## If we have the info make sure that the Public IP is not stuck on 0.0.0.0
-		if( $ip =~ /0\.0\.0\.0/){
-			fail ("Instance did not get an address within 20s");
-			return -1;
+		if( $inst_hash->{'pub-ip'}  =~ /0\.0\.0\.0/){
+			$self->fail ("Instance did not get an address within 20s");
+			return $inst_hash;
 		}
 		
-		pass("Instance $instance_id started with emi $emi at $instance[9] with IP= $ip");
+		pass("Instance $inst_hash->{'id'}  started with emi $inst_hash->{'emi'}  at $inst_hash->{'time'}  with IP= $inst_hash->{'pub-ip'} ");
 		
 		
 		### Poll the instance every 20s for 300s until it leaves the pending state
 		my $period = 20;
 		my $count = 0;
-		while ( ($state eq "pending") && ($count < 15) ){
+		while ( ($inst_hash->{'state'}  eq "pending") && ($count < 15) ){
 			test_name("Polling every 20s until instance in running state");
 			sleep $period;
 			
-			($emi, $ip, $state) = $self->get_instance_info($instance_id);
-			if( $emi !~ /emi/){
+			$inst_hash = $self->get_instance_info($instance_id);
+			
+			if( $inst_hash->{'emi'}  !~ /emi/){
 				$self->fail("Could not find the instance in the describe instances pool");
-				return -1;
+				return $inst_hash;
 			}
 			$count++;
 		}
 		
 		### If the instance is not running after 300s there was an error
-		if( $state ne "running"){
-			$self->fail("Instance went from pending to $state after 300s");
-			return ($instance_id, $emi, $ip, $state, $keypair);
+		if( $inst_hash->{'state'}  ne "running"){
+			$self->fail("Instance went from pending to $inst_hash->{'state'}  after 300s");
+			return $inst_hash;
 		}else{
 			### Returns ($instance_id,  $emi, $ip, $state);
-			pass("Instance is now in $state state after " . ( $count * $period ) . " seconds");
-			return ($instance_id,  $emi, $ip, $state, $keypair);
+			pass("Instance is now in $inst_hash->{'state'}  state after " . ( $count * $period ) . " seconds");
+			return $inst_hash;
 		}
 		
 		
 	}
 	else{
 		$self->fail("Instance not in pending state after run");
-		return -1;
+		return $inst_hash;
 	}
 	
 }
@@ -1227,9 +1233,69 @@ sub get_instance_info{
 			$self->fail("Did not find the instance in the describe instances pool");
 			return -1;
 		}else{
-			my @info = split(' ', $running[0]);
-			### Returns ($emi, $ip, $state,);
-			return ($info[2], $info[3], $info[5], $info[6]);
+			my @info = split(/\s+/, $running[0]);
+			
+			my $inst_hash = {};
+			$inst_hash->{"id"} = $info[1];
+			$inst_hash->{"emi"} = $info[2];
+			$inst_hash->{"pub-ip"} =  $info[3];
+			$inst_hash->{"priv-ip"} =  $info[4];
+			$inst_hash->{"state"} =  $info[5];
+			## TAKE CARE OF CASE WHERE no keypair is given
+#			if( $info[6] =~ /[0-255]/){
+#				$inst_hash->{"keypair"} =  "";
+#				$inst_hash->{"type"} = $info[7];
+#				$inst_hash->{"time"} = $info[8];
+#				$inst_hash->{"az"} = $info[9];
+#				$inst_hash->{"eki"} = $info[10];
+#				$inst_hash->{"eri"} = $info[11];
+#			}else{
+				$inst_hash->{"keypair"} =  $info[6];
+				$inst_hash->{"type"} = $info[8];
+				$inst_hash->{"time"} = $info[9];
+				$inst_hash->{"az"} = $info[10];
+				$inst_hash->{"eki"} = $info[11];
+				$inst_hash->{"eri"} = $info[12];
+			#}
+			print Dumper($inst_hash);
+ 			return $inst_hash;
+		}
+}
+
+sub get_volume_info{
+	my $self = shift;
+	my $instance_id = shift;
+	my @running = $self->sys("$self->{TOOLKIT}describe-volumes $instance_id | grep INSTANCE");
+		if( @running < 1){
+			$self->fail("Did not find the instance in the describe instances pool");
+			return -1;
+		}else{
+			my @info = split(/\s+/, $running[0]);
+			
+			my $inst_hash = {};
+			$inst_hash->{"id"} = $info[1];
+			$inst_hash->{"emi"} = $info[2];
+			$inst_hash->{"pub-ip"} =  $info[3];
+			$inst_hash->{"priv-ip"} =  $info[4];
+			$inst_hash->{"state"} =  $info[5];
+			## TAKE CARE OF CASE WHERE no keypair is given
+			if( $info[6] eq "0"){
+				$inst_hash->{"keypair"} =  "";
+				$inst_hash->{"type"} = $info[7];
+				$inst_hash->{"time"} = $info[8];
+				$inst_hash->{"az"} = $info[9];
+				$inst_hash->{"eki"} = $info[10];
+				$inst_hash->{"eri"} = $info[11];
+			}else{
+				$inst_hash->{"keypair"} =  $info[6];
+				$inst_hash->{"type"} = $info[8];
+				$inst_hash->{"time"} = $info[9];
+				$inst_hash->{"az"} = $info[10];
+				$inst_hash->{"eki"} = $info[11];
+				$inst_hash->{"eri"} = $info[12];
+			}
+			print Dumper($inst_hash);
+ 			return $inst_hash;
 		}
 }
 
@@ -1246,7 +1312,9 @@ sub teardown_instance{
 sub reboot_instance{
 	my $self = shift;
 	my $instance_id = shift;
-	my ($emi, $ip, $state, $keypair) = $self->get_instance_info($instance_id);
+	my $instance = $self->get_instance_info($instance_id);
+	my $ip = $instance->{'ip'};
+	my $keypair = $instance->{'keypair'};
 	my @uptime_old = $self->sys("ssh root\@$ip -i $keypair.priv \"cat /proc/uptime | awk \'{print \$1}\'\"");
 	my @output = $self->sys("$self->{TOOLKIT}reboot-instances $instance_id");
 	sleep 80;
