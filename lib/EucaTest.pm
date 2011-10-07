@@ -1835,6 +1835,20 @@ sub euare_parse_arn{
 	
 }
 
+sub modify_property {
+	my $self = shift;
+	my $property = shift;
+	my $value = shift;
+
+        my $cmd = $self->{EUCALYPTUS} . "/usr/sbin/euca-modify-property -p $property=$value";
+
+	if(!$self->found($cmd, qr/$property/)) {
+                $self->fail("modify property failed for $property=$value");
+	} else {
+		pass("set property $property to $value");
+	}
+}
+
 sub euare_modattr{
 	my $self = shift;
 	my $type = shift;
