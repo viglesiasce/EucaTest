@@ -31,6 +31,10 @@ our $VERSION = '0.01';
 our $ofile = "ubero";
 my $CLC_INFO = {};
 my @running_log;
+
+# timeouts
+my $INST_AVAILABLE_TIMEOUT_SEC = 20;
+
 open(STDERR, ">&STDOUT");
 
 ##################
@@ -1144,18 +1148,18 @@ sub run_instance{
 		my @instance_line_breakout = split(' ', $instance_output[0]);
 		my $instance_id = $instance_line_breakout[1];
 		
-		### Waiting for 20s 
-		$self->test_name("Sleeping 20 seconds for instance to get its IP");
-		sleep 20;
+		### Waiting for a few seconds 
+		$self->test_name("Sleeping ${INST_AVAILABLE_TIMEOUT_SEC} seconds for instance to become available");
+		sleep $INST_AVAILABLE_TIMEOUT_SEC;
 		$inst_hash = $self->get_instance_info($instance_id);
 		## If emi- is found then we can assume we have the rest of the info as well
 		if ( $inst_hash->{'emi'} !~ /emi-/){
-			$self->fail ("Could not find the instance in the describe instances pool after issuing run and waiting 20s");
+			$self->fail ("Could not find the instance in the describe instances pool after issuing run and waiting ${INST_AVAILABLE_TIMEOUT_SEC}s");
 			return $inst_hash;
 		}
 		## If we have the info make sure that the Public IP is not stuck on 0.0.0.0
 		if( $inst_hash->{'pub-ip'}  =~ /0\.0\.0\.0/){
-			$self->fail ("Instance did not get an address within 20s");
+			$self->fail ("Instance did not get an address within ${INST_AVAILABLE_TIMEOUT_SEC}s");
 			return $inst_hash;
 		}
 		
@@ -1189,11 +1193,7 @@ sub run_instance{
 		}
 		
 		
-	}
-	else{
-		$self->fail("Instance not in pending state after run");
-		return $inst_hash;
-	}
+
 	
 }
 
