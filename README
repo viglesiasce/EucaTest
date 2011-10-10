@@ -15,6 +15,9 @@ CREATING YOUR LOCAL TEST CREATION ENVIRONMENT
 1) Install Eclipse
 2) Install the EPIC Perl Plugin
 	- Select Help > Software Updates... in Eclipse, add the update site http://e-p-i-c.sf.net/updates/testing and follow the on-screen instructions.
+	- Setup the following options in Preferences->Perl EPIC->Source Formatter
+		- Cuddle else [checked]
+		- Perltidy options: [-l=999]
 3) Create test-area
 	 mkdir test-area;
 	 cd test-area
@@ -25,10 +28,14 @@ CREATING YOUR LOCAL TEST CREATION ENVIRONMENT
 4) Download the run_instance.pl script from https://bitbucket.org/viglesiasce/eucatest/downloads/run_instance.pl
 5) Copy that file to test-area/stage and make it executable
 6) Run that file to ensure the environment has been setup properly
+7) If you are updating the EucaTest.pm library found in test-area/share/perl_lib/EucaTest/lib/EucaTest.pm
+	- Ensure that before you commit you go to Source->Format in the Menu Bar to maintain style
+
+
 
 COPYRIGHT AND LICENCE
 
-Put the correct copyright and licence information here.
+Put the correct copyright and license information here.
 
 Copyright (C) 2011 by root
 
