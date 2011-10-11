@@ -34,6 +34,11 @@ our $VERSION = '0.01';
 our $ofile   = "ubero";
 my $CLC_INFO = {};
 my @running_log;
+
+# timeouts
+my $INST_AVAILABLE_TIMEOUT_SEC = 20;
+my $INST_IP_TIMEOUT_SEC        = 20;
+
 open( STDERR, ">&STDOUT" );
 
 ##################
@@ -1193,58 +1198,61 @@ sub run_instance {
 	}
 
 	### Check for state pending of the INSTANCE right after the run instance command
-	if ( $instance_output[0] =~ /pending/ ) {
-		my @instance_line_breakout = split( ' ', $instance_output[0] );
-		my $instance_id = $instance_line_breakout[1];
-
-		### Waiting for 20s
-		$self->test_name("Sleeping 20 seconds for instance to get its IP");
-		sleep 20;
-		$inst_hash = $self->get_instance_info($instance_id);
-		## If emi- is found then we can assume we have the rest of the info as well
-		if ( $inst_hash->{'emi'} !~ /emi-/ ) {
-			$self->fail("Could not find the instance in the describe instances pool after issuing run and waiting 20s");
-			return $inst_hash;
-		}
-		## If we have the info make sure that the Public IP is not stuck on 0.0.0.0
-		if ( $inst_hash->{'pub-ip'} =~ /0\.0\.0\.0/ ) {
-			$self->fail("Instance did not get an address within 20s");
-			return $inst_hash;
-		}
-
-		$self->pass("Instance $inst_hash->{'id'}  started with emi $inst_hash->{'emi'}  at $inst_hash->{'time'}  with IP= $inst_hash->{'pub-ip'} ");
-
-		### Poll the instance every 20s for 300s until it leaves the pending state
-		my $period = 20;
-		my $count  = 0;
-		while ( ( $inst_hash->{'state'} eq "pending" ) && ( $count < 15 ) ) {
-			$self->test_name("Polling every 20s until instance in running state");
-			sleep $period;
-
-			$inst_hash = $self->get_instance_info($instance_id);
-
-			if ( $inst_hash->{'emi'} !~ /emi/ ) {
-				$self->fail("Could not find the instance in the describe instances pool");
-				return $inst_hash;
-			}
-			$count++;
-		}
-
-		### If the instance is not running after 300s there was an error
-		if ( $inst_hash->{'state'} ne "running" ) {
-			$self->fail("Instance went from pending to $inst_hash->{'state'}  after 300s");
-			return $inst_hash;
-		} else {
-			### Returns ($instance_id,  $emi, $ip, $state);
-			$self->pass( "Instance is now in $inst_hash->{'state'}  state after " . ( $count * $period ) . " seconds" );
-			return $inst_hash;
-		}
-
-	} else {
+	if ( !( $instance_output[0] =~ /pending/ ) ) {
 		$self->fail("Instance not in pending state after run");
 		return $inst_hash;
 	}
 
+	my @instance_line_breakout = split( ' ', $instance_output[0] );
+	my $instance_id            = $instance_line_breakout[1];
+
+	### Waiting for a few seconds
+	$self->test_name("Sleeping ${INST_AVAILABLE_TIMEOUT_SEC} seconds for instance to become available");
+	sleep $INST_AVAILABLE_TIMEOUT_SEC;
+	$inst_hash = $self->get_instance_info($instance_id);
+	## If emi- is found then we can assume we have the rest of the info as well
+	if ( $inst_hash->{'emi'} !~ /emi-/ ) {
+		$self->fail("Could not find the instance in the describe instances pool after issuing run and waiting ${INST_AVAILABLE_TIMEOUT_SEC}s");
+		return $inst_hash;
+	}
+	$self->pass("Instance $inst_hash->{'id'}  started with emi $inst_hash->{'emi'}  at $inst_hash->{'time'}");
+
+	### Poll the instance every 20s for 300s until it leaves the pending state
+	my $period = 20;
+	my $count  = 0;
+	while ( ( $inst_hash->{'state'} eq "pending" ) && ( $count < 30 ) ) {
+		$self->test_name("Polling every 20s until instance in running state");
+		sleep $period;
+
+		$inst_hash = $self->get_instance_info($instance_id);
+
+		if ( $inst_hash->{'emi'} !~ /emi/ ) {
+			$self->fail("Could not find the instance in the describe instances pool");
+			return $inst_hash;
+		}
+		$count++;
+	}
+
+	### If the instance is not running after 300s there was an error
+	if ( $inst_hash->{'state'} ne "running" ) {
+		$self->fail("Instance went from pending to $inst_hash->{'state'}  after 300s");
+		return $inst_hash;
+	}
+
+	### Wait for instance to obtain an IP (other than 0.0.0.0)
+	if ( !$inst_hash->{'pub-ip'} =~ /0\.0\.0\.0/ ) {
+		sleep $INST_IP_TIMEOUT_SEC;
+		$inst_hash = $self->get_instance_info($instance_id);
+
+		if ( $inst_hash->{'pub-ip'} =~ /0\.0\.0\.0/ ) {
+			$self->fail("Instance did not get an address within ${INST_IP_TIMEOUT_SEC}s");
+			return $inst_hash;
+		}
+	}
+
+	### Returns ($instance_id,  $emi, $ip, $state);
+	$self->pass( "Instance is now in $inst_hash->{'state'}  state after " . ( $count * $period ) . " seconds" );
+	return $inst_hash;
 }
 
 sub terminate_instance {
