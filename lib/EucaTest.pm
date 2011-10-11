@@ -941,7 +941,7 @@ sub get_machines{
 			$current_machine->{'role'}        = $6;
 			#my @roles = split(/\s+/, $qa_role);
 			#= @roles;
-			if( !defined $role || $current_machine->{'role'}    =~ /$role/){
+			if( !defined $role || $current_machine->{'role'}    =~ /$role/i){
 				push(@machines, $current_machine);
 			}
 		} 
