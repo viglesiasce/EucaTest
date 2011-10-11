@@ -907,6 +907,76 @@ sub get_emi {
 
 }
 
+### A machine is a hash of: distro, ip, distro_ver, roles (array), arch, qa_source
+###@machines =  get_machines(clc)
+
+
+
+sub get_machines{
+	my $self     = shift;
+	my $role = shift;
+	my $is_memo  = 0;
+	my $memo     = "";
+	my @machines;
+	
+	open( INPUT, "< ../input/2b_tested.lst" ) || die $!;
+	my $line;
+
+	while ( $line = <INPUT> ) {
+		chomp($line);
+		### IF THIS IS FORMATTED THE WAY THE QA INPUT FILE NEEDS TO SEE MACHINES
+		if ( $line =~ /^([\d\.]+)\t(.+)\t(.+)\t(\d+)\t(.+)\t\[(.+)\]/ ) {
+			### PARSE THE REGEX and get identified values
+			my $current_machine = {};
+			$current_machine->{'ip'}         = $1;
+			$current_machine->{'distro'}     = $2;
+			$current_machine->{'distro_ver'} = $3;
+			$current_machine->{'arch'}       = $4;
+			$current_machine->{'source'}     = $5;
+			$current_machine->{'role'}        = $6;
+			#my @roles = split(/\s+/, $qa_role);
+			#= @roles;
+			if( !defined $role || $current_machine->{'role'}    =~ /$role/){
+				push(@machines, $current_machine);
+			}
+		} 
+	}
+
+	close(INPUT);
+	
+	return @machines;
+}
+
+### returns an ARRAY [indexed by cluster] of HASHES {keyed on component abbrv} of  ARRAYS [indexed on component number] of MACHINES
+### @clusters = get_clusters();
+### $cluster[0]->{'cc'}[0]->{'ip'}
+### $cluster[0]->{'cc'}[1]->{'distro'}
+sub get_clusters{
+	my $self     = shift;
+	my @clusters;
+	open( INPUT, "< ../input/2b_tested.lst" ) || die $!;
+	my $line;
+
+	while ( $line = <INPUT> ) {
+		chomp($line);
+		
+		### IF THIS IS FORMATTED THE WAY THE QA INPUT FILE NEEDS TO SEE MACHINES
+		if ( $line =~ /^([\d\.]+)\t(.+)\t(.+)\t(\d+)\t(.+)\t\[(.+)\]/ ) {
+			my $current_machine = {};
+			$current_machine->{'ip'}         = $1;
+			$current_machine->{'distro'}     = $2;
+			$current_machine->{'distro_ver'} = $3;
+			$current_machine->{'arch'}       = $4;
+			$current_machine->{'source'}     = $5;
+			$current_machine->{'role'}        = $6;
+			
+			
+		}
+	}	
+	return @clusters;
+}
+
+
 sub discover_emis {
 	my $self = shift;
 

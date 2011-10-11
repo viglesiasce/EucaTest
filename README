@@ -5,7 +5,7 @@ EucaTest is an attempt to leverage existing test code to make test writing faste
 
 DEPENDENCIES
 
-This module requires these other modules and libraries:
+This module requires these other modules and libraries which can be installed using CPAN:
 
   IO::Pty
   Net:OpenSSH
