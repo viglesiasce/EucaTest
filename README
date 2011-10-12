@@ -31,6 +31,31 @@ CREATING YOUR LOCAL TEST CREATION ENVIRONMENT
 7) If you are updating the EucaTest.pm library found in test-area/share/perl_lib/EucaTest/lib/EucaTest.pm
 	- Ensure that before you commit you go to Source->Format in the Menu Bar to maintain style
 
+SAMPLE FIRST SCRIPT
+
+#!/usr/bin/perl
+use strict;
+use warnings;
+use Cwd qw(abs_path);
+use Data::Dumper;
+use lib abs_path("../share/perl_lib/EucaTest/lib");
+use EucaTest;
+
+### Pass in the path to the input file and a password if keys have not been exchanged between the tester and DUT
+my $clc_connection = EucaTest->new( {input_file => "../input/2b_tested.lst", password =>"foobar" });
+
+### Create a user using euare commands
+$clc_connection->euare_create_user("user1", "eucalytpus");
+
+### Get credentials for the user
+$clc_connection->get_cred("eucalyptus", "user1","user_cred");
+
+### The fail count gets incremented everytime the fail function is called
+if( $clc_connection->get_fail_count() > 0){
+	exit(1);
+}else{
+	exit(0);	
+}
 
 
 COPYRIGHT AND LICENCE
