@@ -52,27 +52,6 @@ sub new {
 	my $host       = $opts->{'host'};
 	my $keypath    = $opts->{'keypath'};
 	my $fail_count = 0;
-	### IF we are going to a remote server to exec commands
-	if ( defined $host ) {
-		chomp $host;
-		print "Creating an SSH connection to $host\n";
-		## are we authenticating with keys or with password alone
-		if ( defined $keypath ) {
-			chomp $keypath;
-
-			#			 $self->test_name("Creating a keypair authenticated SSH connection to $host");
-			$ssh = Net::OpenSSH->new( $host, key_path => $keypath, master_opts => [ -o => "StrictHostKeyChecking=no" ] );
-			print $ssh->error;
-		} else {
-
-			#			$self->test_name( "Creating a password authenticated SSH connection to $host");
-			$ssh = Net::OpenSSH->new( $host, master_opts => [ -o => "StrictHostKeyChecking=no" ] );
-			print $ssh->error;
-		}
-	} else {
-		print "Creating a LOCAL connection\n";
-		undef $ssh;
-	}
 
 	my $credpath = $opts->{'credpath'};
 	if ( !defined $credpath ) {
@@ -89,8 +68,13 @@ sub new {
 	}
 
 	my $eucadir = $opts->{'eucadir'};
-	if ( !defined $eucadir ) {
-		$eucadir = "/opt/eucalyptus";
+	if ( !defined $eucadir && defined $CLC_INFO->{"QA_SRC"}) {
+		if ( $CLC_INFO->{"QA_SRC"} !~ /repo/i ) {
+			$eucadir = "/opt/eucalyptus";
+		} else {
+			$eucadir = "/";
+		}
+
 	}
 
 	my $verify_level = $opts->{'verifylevel'};
@@ -102,10 +86,50 @@ sub new {
 	if ( !defined $toolkit ) {
 		$toolkit = "euca-";
 	}
+	my $input_file = $opts->{'input_file'};
+	if ( !defined $input_file ) {
+		$input_file = "";
+	}
 
-	my $self = { SSH => $ssh, CREDPATH => $credpath, TIMEOUT => $timeout, EUCALYPTUS => $eucadir, VERIFY_LEVEL => $verify_level, TOOLKIT => $toolkit, DELAY => $delay, FAIL_COUNT => $fail_count };
+	## Need to add colon to hostname after user if sending a password embedded in the hostname OpenSSH requirement
+	my $password = $opts->{'password'};
+	if ( !defined $password ) {
+		$password = "";
+	} else {
+		$password = ":" . $password;
+	}
+	my $self = { SSH => $ssh, CREDPATH => $credpath, TIMEOUT => $timeout, EUCADIR => $eucadir, VERIFY_LEVEL => $verify_level, TOOLKIT => $toolkit, DELAY => $delay, FAIL_COUNT => $fail_count, INPUT_FILE => $input_file, PASSWORD => $password };
 	bless $self;
 
+	if ( $input_file ne "" ) {
+		$CLC_INFO = $self->read_input_file($input_file);
+		$host     = "root" . $password . "\@" . $CLC_INFO->{'QA_IP'};
+	}
+
+	### IF we are going to a remote server to exec commands
+	if ( defined $host ) {
+		chomp $host;
+		print "Creating an SSH connection to $host\n";
+		## are we authenticating with keys or with password alone
+		if ( defined $keypath ) {
+			chomp $keypath;
+
+			#			 $self->test_name("Creating a keypair authenticated SSH connection to $host");
+			$ssh = Net::OpenSSH->new( $host, key_path => $keypath, master_opts => [ -o => "StrictHostKeyChecking=no" ] );
+			$self->{SSH} = $ssh;
+			print $ssh->error;
+
+		} else {
+
+			#			$self->test_name( "Creating a password authenticated SSH connection to $host");
+			$ssh = Net::OpenSSH->new( $host, master_opts => [ -o => "StrictHostKeyChecking=no" ] );
+			$self->{SSH} = $ssh;
+			print $ssh->error;
+		}
+	} else {
+		print "Creating a LOCAL connection\n";
+		undef $ssh;
+	}
 	if ( defined $ssh && $self->get_credpath eq "" ) {
 		my $admin_credpath = $self->get_cred( "eucalyptus", "admin" );
 
@@ -165,6 +189,17 @@ sub tee {
 	return 0;
 }
 
+sub generate_random_string {
+	my $self  = shift;
+	my $len   = shift;
+	my @chars = ( 'a' .. 'z', 'A' .. 'Z', '0' .. '9', '-' );
+	my $string;
+	foreach ( 1 .. $len ) {
+		$string .= $chars[ rand @chars ];
+	}
+	return $string;
+}
+
 sub get_fail_count {
 	my $self = shift;
 	return $self->{FAIL_COUNT};
@@ -215,6 +250,18 @@ sub set_ssh {
 	my $self = shift;
 	my $ssh  = shift;
 	$self->{SSH} = $ssh;
+	return 0;
+}
+
+sub get_eucadir {
+	my $self = shift;
+	return $self->{EUCADIR};
+}
+
+sub set_eucadir {
+	my $self = shift;
+	my $dir  = shift;
+	$self->{EUCADIR} = $dir;
 	return 0;
 }
 
@@ -624,7 +671,7 @@ sub read_input_file {
 		}
 	}
 	if ( $CONFIG{'QA_SOURCE'} =~ /repo/i ) {
-		$self->{EUCALYPTUS} = "/";
+		$self->{EUCADIR} = "/";
 	}
 
 	close(INPUT);
@@ -675,7 +722,7 @@ sub get_cred {
 		return -1;
 	}
 
-	my $cmd = $self->{EUCALYPTUS} . "/usr/sbin/euca_conf --get-credentials $cred_dir/euca.zip --cred-account $account --cred-user $user";
+	my $cmd = $self->{EUCADIR} . "/usr/sbin/euca_conf --get-credentials $cred_dir/euca.zip --cred-account $account --cred-user $user";
 	##Get credentials as a zip file in $cred_dir
 	$self->sys($cmd);
 
@@ -915,15 +962,13 @@ sub get_emi {
 ### A machine is a hash of: distro, ip, distro_ver, roles (array), arch, qa_source
 ###@machines =  get_machines(clc)
 
-
-
-sub get_machines{
-	my $self     = shift;
-	my $role = shift;
-	my $is_memo  = 0;
-	my $memo     = "";
+sub get_machines {
+	my $self    = shift;
+	my $role    = shift;
+	my $is_memo = 0;
+	my $memo    = "";
 	my @machines;
-	
+
 	open( INPUT, "< ../input/2b_tested.lst" ) || die $!;
 	my $line;
 
@@ -938,17 +983,18 @@ sub get_machines{
 			$current_machine->{'distro_ver'} = $3;
 			$current_machine->{'arch'}       = $4;
 			$current_machine->{'source'}     = $5;
-			$current_machine->{'role'}        = $6;
+			$current_machine->{'role'}       = $6;
+
 			#my @roles = split(/\s+/, $qa_role);
 			#= @roles;
-			if( !defined $role || $current_machine->{'role'}    =~ /$role/i){
-				push(@machines, $current_machine);
+			if ( !defined $role || $current_machine->{'role'} =~ /$role/i ) {
+				push( @machines, $current_machine );
 			}
-		} 
+		}
 	}
 
 	close(INPUT);
-	
+
 	return @machines;
 }
 
@@ -956,15 +1002,15 @@ sub get_machines{
 ### @clusters = get_clusters();
 ### $cluster[0]->{'cc'}[0]->{'ip'}
 ### $cluster[0]->{'cc'}[1]->{'distro'}
-sub get_clusters{
-	my $self     = shift;
+sub get_clusters {
+	my $self = shift;
 	my @clusters;
 	open( INPUT, "< ../input/2b_tested.lst" ) || die $!;
 	my $line;
 
 	while ( $line = <INPUT> ) {
 		chomp($line);
-		
+
 		### IF THIS IS FORMATTED THE WAY THE QA INPUT FILE NEEDS TO SEE MACHINES
 		if ( $line =~ /^([\d\.]+)\t(.+)\t(.+)\t(\d+)\t(.+)\t\[(.+)\]/ ) {
 			my $current_machine = {};
@@ -973,14 +1019,12 @@ sub get_clusters{
 			$current_machine->{'distro_ver'} = $3;
 			$current_machine->{'arch'}       = $4;
 			$current_machine->{'source'}     = $5;
-			$current_machine->{'role'}        = $6;
-			
-			
+			$current_machine->{'role'}       = $6;
+
 		}
-	}	
+	}
 	return @clusters;
 }
-
 
 sub discover_emis {
 	my $self = shift;
@@ -1204,7 +1248,7 @@ sub run_instance {
 	}
 
 	my @instance_line_breakout = split( ' ', $instance_output[0] );
-	my $instance_id            = $instance_line_breakout[1];
+	my $instance_id = $instance_line_breakout[1];
 
 	### Waiting for a few seconds
 	$self->test_name("Sleeping ${INST_AVAILABLE_TIMEOUT_SEC} seconds for instance to become available");
@@ -1890,7 +1934,7 @@ sub modify_property {
 	my $property = shift;
 	my $value    = shift;
 
-	my $cmd = $self->{EUCALYPTUS} . "/usr/sbin/euca-modify-property -p $property=$value";
+	my $cmd = $self->{EUCADIR} . "/usr/sbin/euca-modify-property -p $property=$value";
 
 	if ( !$self->found( $cmd, qr/$property/ ) ) {
 		$self->fail("modify property failed for $property=$value");
