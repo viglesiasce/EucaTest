@@ -68,11 +68,11 @@ sub new {
 	}
 
 	my $eucadir = $opts->{'eucadir'};
-	if ( !defined $eucadir && defined $CLC_INFO->{"QA_SRC"}) {
-		if ( $CLC_INFO->{"QA_SRC"} !~ /repo/i ) {
-			$eucadir = "/opt/eucalyptus";
-		} else {
+	if ( !defined $eucadir ) {
+		if ( $CLC_INFO->{"QA_SOURCE"} =~ /repo/i ) {
 			$eucadir = "/";
+		}else{
+				$eucadir = "/opt/eucalyptus";
 		}
 
 	}
