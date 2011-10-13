@@ -59,7 +59,7 @@ sub new {
 	}
 	my $delay = $opts->{'delay'};
 	if ( !defined $delay ) {
-		$delay = 0;
+		$delay = 1;
 	}
 
 	my $timeout = $opts->{'timeout'};
