@@ -135,7 +135,7 @@ sub new {
 			$self->set_credpath($admin_credpath);
 		}
 		if( defined $CLC_INFO->{'QA_SOURCE'} && $CLC_INFO->{'QA_SOURCE'} =~ /repo/i ){
-			$self->set_eucadir = "/";
+			$self->set_eucadir("/");
 		}
 	}
 
