@@ -69,12 +69,7 @@ sub new {
 
 	my $eucadir = $opts->{'eucadir'};
 	if ( !defined $eucadir ) {
-		if ( $CLC_INFO->{"QA_SOURCE"} =~ /repo/i ) {
-			$eucadir = "/";
-		}else{
-				$eucadir = "/opt/eucalyptus";
-		}
-
+		$eucadir = "/opt/eucalyptus";
 	}
 
 	my $verify_level = $opts->{'verifylevel'};
@@ -88,7 +83,7 @@ sub new {
 	}
 	my $input_file = $opts->{'input_file'};
 	if ( !defined $input_file ) {
-		$input_file = "";
+		$input_file = "../input/2b_tested.lst";
 	}
 
 	## Need to add colon to hostname after user if sending a password embedded in the hostname OpenSSH requirement
@@ -101,13 +96,13 @@ sub new {
 	my $self = { SSH => $ssh, CREDPATH => $credpath, TIMEOUT => $timeout, EUCADIR => $eucadir, VERIFY_LEVEL => $verify_level, TOOLKIT => $toolkit, DELAY => $delay, FAIL_COUNT => $fail_count, INPUT_FILE => $input_file, PASSWORD => $password };
 	bless $self;
 
-	if ( $input_file ne "" ) {
-		$CLC_INFO = $self->read_input_file($input_file);
-		$host     = "root" . $password . "\@" . $CLC_INFO->{'QA_IP'};
-	}
 
+		$CLC_INFO = $self->read_input_file($input_file);
+		if( !defined $host){
+			$host     = "root" . $password . "\@" . $CLC_INFO->{'QA_IP'};
+		}
 	### IF we are going to a remote server to exec commands
-	if ( defined $host ) {
+	if ( $host !~ /local/i) {
 		chomp $host;
 		print "Creating an SSH connection to $host\n";
 		## are we authenticating with keys or with password alone
@@ -130,13 +125,17 @@ sub new {
 		print "Creating a LOCAL connection\n";
 		undef $ssh;
 	}
+	
+	### IF we dont have credentials and are sshing to a remote host, get credentials 
 	if ( defined $ssh && $self->get_credpath eq "" ) {
 		my $admin_credpath = $self->get_cred( "eucalyptus", "admin" );
-
 		if ( $admin_credpath !~ /eucarc/ ) {
 			$self->fail("Failed to download credentials");
 		} else {
 			$self->set_credpath($admin_credpath);
+		}
+		if( defined $CLC_INFO->{'QA_SOURCE'} && $CLC_INFO->{'QA_SOURCE'} =~ /repo/i ){
+			$self->set_eucadir = "/";
 		}
 	}
 
