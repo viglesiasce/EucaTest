@@ -134,10 +134,11 @@ sub new {
 		} else {
 			$self->set_credpath($admin_credpath);
 		}
+	
+	}
 		if( defined $CLC_INFO->{'QA_SOURCE'} && $CLC_INFO->{'QA_SOURCE'} =~ /repo/i ){
 			$self->set_eucadir("/");
 		}
-	}
 
 	return $self;
 }
@@ -1278,7 +1279,7 @@ sub run_instance {
 
 	### If the instance is not running after 300s there was an error
 	if ( $inst_hash->{'state'} ne "running" ) {
-		$self->fail("Instance went from pending to $inst_hash->{'state'}  after 300s");
+		$self->fail("Instance went from pending to $inst_hash->{'state'}  after " . ( $count * $period ) . "s");
 		return $inst_hash;
 	}
 

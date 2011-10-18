@@ -8,7 +8,7 @@
 use strict;
 use warnings;
 
-use Test::More tests => 3;
+use Test::More tests => 1;
 BEGIN { use_ok('EucaTest') };
 
 #########################
@@ -17,14 +17,7 @@ BEGIN { use_ok('EucaTest') };
 # its man page ( perldoc Test::More ) for help writing this test script.
 
 #"root:foobar\@192.168.51.74"
-my $euca = EucaTest->new();
+my $euca = EucaTest->new({host=>"local"});
  
-my @output = $euca->sys("whoami");
+like($euca->get_fail_count(), qr/0/, "Check for default eucadir");
 
-like($output[0], qr/^/, "Check simple whoami command on remote device");
-diag("Output is: @output");
-my $mycredpath = "yada";
-$euca->set_credpath($mycredpath);
-my $new_credpath = $euca->get_credpath();
-like($new_credpath, qr/$mycredpath/, "Check for default credpath");
-diag("Credpath set to  $new_credpath");
