@@ -1269,7 +1269,7 @@ sub run_instance {
 		sleep $period;
 
 		$inst_hash = $self->get_instance_info($instance_id);
-
+	
 		if ( $inst_hash->{'emi'} !~ /emi/ ) {
 			$self->fail("Could not find the instance in the describe instances pool");
 			return $inst_hash;
@@ -1332,14 +1332,15 @@ sub terminate_instance {
 sub get_instance_info {
 	my $self        = shift;
 	my $instance_id = shift;
+	my $inst_hash = {};
 	my @running     = $self->sys("$self->{TOOLKIT}describe-instances $instance_id | grep INSTANCE");
 	if ( @running < 1 ) {
 		$self->fail("Did not find the instance in the describe instances pool");
-		return -1;
+		return $inst_hash;
 	} else {
 		my @info = split( /\s+/, $running[0] );
 
-		my $inst_hash = {};
+		
 		$inst_hash->{"id"}      = $info[1];
 		$inst_hash->{"emi"}     = $info[2];
 		$inst_hash->{"pub-ip"}  = $info[3];
