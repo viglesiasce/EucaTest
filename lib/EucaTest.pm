@@ -96,13 +96,12 @@ sub new {
 	my $self = { SSH => $ssh, CREDPATH => $credpath, TIMEOUT => $timeout, EUCADIR => $eucadir, VERIFY_LEVEL => $verify_level, TOOLKIT => $toolkit, DELAY => $delay, FAIL_COUNT => $fail_count, INPUT_FILE => $input_file, PASSWORD => $password };
 	bless $self;
 
-
-		$CLC_INFO = $self->read_input_file($input_file);
-		if( !defined $host){
-			$host     = "root" . $password . "\@" . $CLC_INFO->{'QA_IP'};
-		}
+	$CLC_INFO = $self->read_input_file($input_file);
+	if ( !defined $host ) {
+		$host = "root" . $password . "\@" . $CLC_INFO->{'QA_IP'};
+	}
 	### IF we are going to a remote server to exec commands
-	if ( $host !~ /local/i) {
+	if ( $host !~ /local/i ) {
 		chomp $host;
 		print "Creating an SSH connection to $host\n";
 		## are we authenticating with keys or with password alone
@@ -125,8 +124,8 @@ sub new {
 		print "Creating a LOCAL connection\n";
 		undef $ssh;
 	}
-	
-	### IF we dont have credentials and are sshing to a remote host, get credentials 
+
+	### IF we dont have credentials and are sshing to a remote host, get credentials
 	if ( defined $ssh && $self->get_credpath eq "" ) {
 		my $admin_credpath = $self->get_cred( "eucalyptus", "admin" );
 		if ( $admin_credpath !~ /eucarc/ ) {
@@ -134,11 +133,11 @@ sub new {
 		} else {
 			$self->set_credpath($admin_credpath);
 		}
-	
+
 	}
-		if( defined $CLC_INFO->{'QA_SOURCE'} && $CLC_INFO->{'QA_SOURCE'} =~ /repo/i ){
-			$self->set_eucadir("/");
-		}
+	if ( defined $CLC_INFO->{'QA_SOURCE'} && $CLC_INFO->{'QA_SOURCE'} =~ /repo/i ) {
+		$self->set_eucadir("/");
+	}
 
 	return $self;
 }
@@ -1269,7 +1268,7 @@ sub run_instance {
 		sleep $period;
 
 		$inst_hash = $self->get_instance_info($instance_id);
-	
+
 		if ( $inst_hash->{'emi'} !~ /emi/ ) {
 			$self->fail("Could not find the instance in the describe instances pool");
 			return $inst_hash;
@@ -1279,7 +1278,7 @@ sub run_instance {
 
 	### If the instance is not running after 300s there was an error
 	if ( $inst_hash->{'state'} ne "running" ) {
-		$self->fail("Instance went from pending to $inst_hash->{'state'}  after " . ( $count * $period ) . "s");
+		$self->fail( "Instance went from pending to $inst_hash->{'state'}  after " . ( $count * $period ) . "s" );
 		return $inst_hash;
 	}
 
@@ -1332,7 +1331,7 @@ sub terminate_instance {
 sub get_instance_info {
 	my $self        = shift;
 	my $instance_id = shift;
-	my $inst_hash = {};
+	my $inst_hash   = {};
 	my @running     = $self->sys("$self->{TOOLKIT}describe-instances $instance_id | grep INSTANCE");
 	if ( @running < 1 ) {
 		$self->fail("Did not find the instance in the describe instances pool");
@@ -1340,7 +1339,6 @@ sub get_instance_info {
 	} else {
 		my @info = split( /\s+/, $running[0] );
 
-		
 		$inst_hash->{"id"}      = $info[1];
 		$inst_hash->{"emi"}     = $info[2];
 		$inst_hash->{"pub-ip"}  = $info[3];
@@ -1370,22 +1368,21 @@ sub get_instance_info {
 
 sub get_volume_info {
 	my $self        = shift;
-	my $volume_id = shift;
-	my $vol_info = {};
-	my @volume_desc     = $self->sys("$self->{TOOLKIT}describe-volumes $volume_id | grep VOLUME");
+	my $volume_id   = shift;
+	my $vol_info    = {};
+	my @volume_desc = $self->sys("$self->{TOOLKIT}describe-volumes $volume_id | grep VOLUME");
 	if ( @volume_desc < 1 ) {
 		$self->fail("Did not find the volume in the describe volumes pool");
 		return $vol_info;
 	} else {
 		my @info = split( /\s+/, $volume_desc[0] );
 
-		
-		$vol_info->{"id"}      = $info[1];
-		$vol_info->{"size"}     = $info[2];
-		$vol_info->{"zone"}  = $info[3];
-		$vol_info->{"state"} = $info[4];
-		$vol_info->{"timestamp"}   = $info[5];
-		
+		$vol_info->{"id"}        = $info[1];
+		$vol_info->{"size"}      = $info[2];
+		$vol_info->{"zone"}      = $info[3];
+		$vol_info->{"state"}     = $info[4];
+		$vol_info->{"timestamp"} = $info[5];
+
 		print Dumper($vol_info);
 		return $vol_info;
 	}
