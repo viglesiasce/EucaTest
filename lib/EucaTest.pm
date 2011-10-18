@@ -1370,38 +1370,24 @@ sub get_instance_info {
 
 sub get_volume_info {
 	my $self        = shift;
-	my $instance_id = shift;
-	my @running     = $self->sys("$self->{TOOLKIT}describe-volumes $instance_id | grep INSTANCE");
-	if ( @running < 1 ) {
-		$self->fail("Did not find the instance in the describe instances pool");
-		return -1;
+	my $volume_id = shift;
+	my $vol_info = {};
+	my @volume_desc     = $self->sys("$self->{TOOLKIT}describe-volumes $volume_id | grep VOLUME");
+	if ( @volume_desc < 1 ) {
+		$self->fail("Did not find the volume in the describe volumes pool");
+		return $vol_info;
 	} else {
-		my @info = split( /\s+/, $running[0] );
+		my @info = split( /\s+/, $volume_desc[0] );
 
-		my $inst_hash = {};
-		$inst_hash->{"id"}      = $info[1];
-		$inst_hash->{"emi"}     = $info[2];
-		$inst_hash->{"pub-ip"}  = $info[3];
-		$inst_hash->{"priv-ip"} = $info[4];
-		$inst_hash->{"state"}   = $info[5];
-		## TAKE CARE OF CASE WHERE no keypair is given
-		if ( $info[6] eq "0" ) {
-			$inst_hash->{"keypair"} = "";
-			$inst_hash->{"type"}    = $info[7];
-			$inst_hash->{"time"}    = $info[8];
-			$inst_hash->{"az"}      = $info[9];
-			$inst_hash->{"eki"}     = $info[10];
-			$inst_hash->{"eri"}     = $info[11];
-		} else {
-			$inst_hash->{"keypair"} = $info[6];
-			$inst_hash->{"type"}    = $info[8];
-			$inst_hash->{"time"}    = $info[9];
-			$inst_hash->{"az"}      = $info[10];
-			$inst_hash->{"eki"}     = $info[11];
-			$inst_hash->{"eri"}     = $info[12];
-		}
-		print Dumper($inst_hash);
-		return $inst_hash;
+		
+		$vol_info->{"id"}      = $info[1];
+		$vol_info->{"size"}     = $info[2];
+		$vol_info->{"zone"}  = $info[3];
+		$vol_info->{"state"} = $info[4];
+		$vol_info->{"timestamp"}   = $info[5];
+		
+		print Dumper($vol_info);
+		return $vol_info;
 	}
 }
 
