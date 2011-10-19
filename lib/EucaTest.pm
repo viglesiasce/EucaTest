@@ -468,7 +468,7 @@ sub update_testlink {
 		}
 	} else {
 		print "No REVNO found so not updating testlink, talk to Vic";
-		return -1;
+		return undef;
 	}
 
 	chomp($tplan_id);
@@ -481,7 +481,7 @@ sub update_testlink {
 	my @exec_resp = $self->sys("ssh root\@192.168.51.187 -o StrictHostKeyChecking=no \'./testlink/update_testcase.pl artifacts/$run_file testcaseexternalid=$tc_id,testplanid=$tplan_id,status=$status,buildid=$build_id,platformid=$platform\'");
 	if ( @exec_resp < 1 ) {
 		print "Could not update testcase in testplan";
-		return -1;
+		return undef;
 	}
 	my @rm_resp = $self->sys("ssh root\@192.168.51.187 -o StrictHostKeyChecking=no \'rm artifacts/$run_file \'");
 	##UPLOADING THE TC RESULT WILL RETURN ME THE EXEC ID
@@ -496,7 +496,7 @@ sub attach_artifacts {
 	my $exec_id = shift;
 	if ( !defined $exec_id || $exec_id == -1 ) {
 		print "Invalid exec_id provided to attach artifacts\n";
-		return -1;
+		return undef;
 	}
 	chomp $exec_id;
 	## SEND THE ARTIFACTS TO THE REMOTE MACHINE
@@ -718,7 +718,7 @@ sub get_cred {
 
 	if ( !$self->found( "ls", qr/$cred_dir/ ) ) {
 		$self->fail("Unable to make directory: $cred_dir");
-		return -1;
+		return "";
 	}
 
 	my $cmd = $self->{EUCADIR} . "/usr/sbin/euca_conf --get-credentials $cred_dir/euca.zip --cred-account $account --cred-user $user";
@@ -727,7 +727,7 @@ sub get_cred {
 
 	if ( !$self->found( "ls $cred_dir", qr/euca.zip/ ) ) {
 		$self->fail("Unable to make credentials");
-		return -1;
+		return "";
 	}
 
 	##Change to that directory and unzip the credentials
@@ -774,11 +774,11 @@ sub add_keypair {
 			$self->fail("No key inside private key file");
 			my @key = $self->sys("cat $filepath");
 			print "Key File Contains:\n@key";
-			return -1;
+			return undef;
 		}
 	} else {
 		$self->fail("Keypair file not found at $filepath");
-		return -1;
+		return undef;
 	}
 
 }
@@ -791,7 +791,7 @@ sub delete_keypair {
 
 	if ( @output < 1 ) {
 		$self->fail("Delete keypair command did not return anything");
-		return -1;
+		return undef;
 	}
 	## Check the first line of output for KEYPAIR
 	if ( $output[0] =~ /KEYPAIR/ ) {
@@ -806,12 +806,12 @@ sub delete_keypair {
 			return $keyname;
 		} else {
 			$self->fail("Keypair is still present or a keypair with this keypairs name embedded exists");
-			return -1;
+			return undef;
 		}
 
 	} else {
 		$self->fail("Delete keypair command did not return the keypair which was deleted");
-		return -1;
+		return undef;
 	}
 }
 
@@ -850,7 +850,7 @@ sub add_group {
 			$self->pass("Added group $groupname successfully");
 		} else {
 			$self->fail("Unable to add group $groupname");
-			return -1;
+			return undef;
 		}
 	} else {
 		$self->pass("Group $groupname already exists not creating");
@@ -864,7 +864,7 @@ sub add_group {
 			$self->pass("Added ICMP authorization for $groupname successfully");
 		} else {
 			$self->fail("Unable authorize group $groupname for ICMP");
-			return -1;
+			return undef;
 		}
 
 		my @auth_ssh = $self->sys("$self->{TOOLKIT}authorize $groupname -p 22");
@@ -872,7 +872,7 @@ sub add_group {
 			$self->pass("Added SSH authorization for $groupname successfully");
 		} else {
 			$self->fail("Unable authorize group $groupname for SSH");
-			return -1;
+			return undef;
 		}
 	} else {
 		my @auth_rule = $self->sys("$self->{TOOLKIT}authorize $groupname $rule");
@@ -880,7 +880,7 @@ sub add_group {
 			$self->pass("Added $rule authorization for $groupname successfully");
 		} else {
 			$self->fail("Unable authorize group $groupname for $rule");
-			return -1;
+			return undef;
 		}
 	}
 
@@ -897,7 +897,7 @@ sub delete_group {
 		return $groupname;
 	} else {
 		$self->fail("Unable to delete group $groupname");
-		return -1;
+		return undef;
 	}
 }
 
@@ -910,7 +910,7 @@ sub allocate_address {
 		return $ip[1];
 	} else {
 		$self->fail("Unable to allocate address");
-		return -1;
+		return undef;
 	}
 
 }
@@ -927,11 +927,11 @@ sub release_address {
 			return $ip[1];
 		} else {
 			$self->fail("Wrong address released");
-			return -1;
+			return undef;
 		}
 	} else {
 		$self->fail("Unable to release address $address");
-		return -1;
+		return undef;
 	}
 }
 
@@ -945,7 +945,7 @@ sub get_emi {
 	my @output = $self->sys($cmd);
 	if ( @output < 1 ) {
 		$self->fail("No EMI found");
-		return -1;
+		return undef;
 	}
 	if ( $output[0] =~ /emi/ ) {
 		my @emi = split( ' ', $output[0] );
@@ -953,7 +953,7 @@ sub get_emi {
 		return $emi[1];
 	} else {
 		$self->fail("No EMIs found");
-		return -1;
+		return undef;
 	}
 
 }
@@ -1032,7 +1032,7 @@ sub discover_emis {
 	my ( $crc, $rc, $buf ) = piperun( $cmd, "grep IMAGE | grep -i 'mi-' | grep available | awk '{print \$2}'", "$ofile" );
 	if ($rc) {
 		$self->fail("Failed in running describe images when trying to discover EMIs");
-		return -1;
+		return undef;
 	}
 	my @emi_list = ();
 	my @output = split( /\s+/, $buf );
@@ -1056,12 +1056,12 @@ sub download_euca_image {
 	#Download the tarball
 	if ( !defined $source || !defined $dest ) {
 		$self->fail("Base URL or image name not defined");
-		return -1;
+		return undef;
 	}
 	$self->sys( "wget $source$dest", 600 );
 	if ( !$self->found( "ls", qr/$dest/ ) ) {
 		$self->fail("Unable to download file");
-		return -1;
+		return undef;
 	} else {
 		print "Finished downloading file: $dest\n";
 	}
@@ -1071,7 +1071,7 @@ sub download_euca_image {
 	my @dir = split( /.tgz/, $dest );
 	if ( !$self->found( "ls $dir[0]", qr/.img/ ) ) {
 		$self->fail("Unable to untar file");
-		return -1;
+		return undef;
 	} else {
 		print "Finished untarring bundle: $dest\n";
 	}
@@ -1086,7 +1086,7 @@ sub upload_euca_image {
 	my $prefix     = shift;
 	if ( !defined $dir || !defined $hypervisor || !defined $prefix ) {
 		$self->fail("Required params for upload_euca_image not defined");
-		return -1;
+		return undef;
 	}
 
 	$self->set_timeout(600);
@@ -1104,7 +1104,7 @@ sub upload_euca_image {
 	my @eki_result = $self->sys("$self->{TOOLKIT}register $prefix-kernel-bucket/$kernel[0].manifest.xml");
 	if ( $eki_result[0] !~ /eki/ ) {
 		$self->fail("Kernel not uploaded properly: $eki_result[0]");
-		return -1;
+		return undef;
 	}
 
 	$self->sys("$self->{TOOLKIT}bundle-image -i $dir/$hypervisor-kernel/$ramdisk[0] -d bundle --ramdisk true");
@@ -1112,7 +1112,7 @@ sub upload_euca_image {
 	my @eri_result = $self->sys("$self->{TOOLKIT}register $prefix-ramdisk-bucket/$ramdisk[0].manifest.xml");
 	if ( $eri_result[0] !~ /eri/ ) {
 		$self->fail("Ramdisk not uploaded properly");
-		return -1;
+		return undef;
 	}
 
 	my @eki = split( /\s/, $eki_result[0] );
@@ -1129,7 +1129,7 @@ sub upload_euca_image {
 
 	if ( $emi_result[0] !~ /emi/ ) {
 		$self->fail("Image not uploaded properly");
-		return -1;
+		return undef;
 	}
 
 	return ( $emi[1], $eri[1], $eki[1] );
@@ -1147,7 +1147,7 @@ sub deregister_image {
 	##If there was no output fail
 	if ( @dereg1 < 1 ) {
 		$self->fail("Deregister image the first time did not return any output");
-		return -1;
+		return undef;
 	} else {
 		## Was the image in the output
 		if ( $dereg1[0] =~ /$image/ ) {
@@ -1155,7 +1155,7 @@ sub deregister_image {
 			## Is the image still in the desc-images output
 			if ( @desc1 < 1 ) {
 				$self->fail("Image $image removed from describe images on first deregister");
-				return -1;
+				return undef;
 			} else {
 				## Need to deregister a second time to remove it if its in deregistered
 				if ( $desc1[0] =~ /deregistered/ ) {
@@ -1163,7 +1163,7 @@ sub deregister_image {
 
 					if ( @dereg2 < 1 ) {
 						$self->fail("Deregister image the second time did not return any output");
-						return -1;
+						return undef;
 					} else {
 						my @desc2 = $self->sys("$self->{TOOLKIT}describe-images | grep $image");
 						if ( @desc2 < 1 ) {
@@ -1174,20 +1174,20 @@ sub deregister_image {
 							return $image;
 						} else {
 							$self->fail("Image still in store\n@desc2");
-							return -1;
+							return undef;
 						}
 					}
 
 				} else {
 					$self->fail("Image not in deregistered state\n$desc1[0]\n");
-					return -1;
+					return undef;
 				}
 
 			}
 
 		}
 	}
-	return -1;
+	return undef;
 
 }
 
@@ -1200,7 +1200,7 @@ sub delete_bundle {
 		return 0;
 	} else {
 		$self->fail("Output returned from delete-bundle\n@deletebundle");
-		return -1;
+		return undef;
 	}
 
 }
@@ -1230,14 +1230,14 @@ sub run_instance {
 	my @run_output = $self->sys($base_command);
 	if ( @run_output < 1 ) {
 		$self->fail("Initial attempt at running instance returned nothing");
-		return -1;
+		return undef;
 	}
 
 	### There was output to the run instance command, check if it includes INSTANCE
 	my @instance_output = grep( /INSTANCE/, @run_output );
 	if ( @instance_output < 1 ) {
 		$self->fail("Initial attempt at running instance returned:\n@run_output");
-		return -1;
+		return undef;
 	}
 
 	### Check for state pending of the INSTANCE right after the run instance command
@@ -1304,14 +1304,14 @@ sub terminate_instance {
 	my @output      = $self->sys("$self->{TOOLKIT}terminate-instances $instance_id");
 	if ( @output < 1 ) {
 		$self->fail("Terminate instance command failed");
-		return -1;
+		return undef;
 	}
 	if ( $output[0] =~ /$instance_id/ ) {
 		sleep 30;
 		my @describe_instances = $self->sys("$self->{TOOLKIT}describe-instances | grep $instance_id");
 		if ( @describe_instances < 1 ) {
 			$self->fail("After terminating instance it is no longer found in the describe instances output");
-			return -1;
+			return undef;
 		}
 		my @instance = split( ' ', $describe_instances[0] );
 		if ( $instance[5] =~ /terminated/ ) {
@@ -1319,11 +1319,11 @@ sub terminate_instance {
 			return $instance_id;
 		} else {
 			$self->fail("Unable to terminate $instance_id, stuck in $instance[5] state");
-			return -1;
+			return undef;
 		}
 	} else {
 		$self->fail("Unable to terminate $instance_id");
-		return -1;
+		return undef;
 	}
 
 }
@@ -1415,7 +1415,7 @@ sub reboot_instance {
 		return $instance_id;
 	} else {
 		$self->fail("Uptime is greater than before reboot. Must not have rebooted instance properly");
-		return -1;
+		return undef;
 	}
 }
 
@@ -1428,11 +1428,11 @@ sub create_volume {
 
 	if ( !defined $zone ) {
 		$self->fail("Required parameter zone not provided to function create_volume");
-		return -1;
+		return undef;
 	}
 	if ( !defined $opts->{"size"} && !defined $opts->{"snapshot"} ) {
 		$self->fail("Required parameter size or snapshot not provided to function create_volume");
-		return -1;
+		return undef;
 	}
 	my $cmd = "$self->{TOOLKIT}create-volume -z $zone";
 
@@ -1448,12 +1448,12 @@ sub create_volume {
 
 	if ( $vol_create[0] !~ /$vol_id[1].*creating.*/ ) {
 		$self->fail("After running volume-create output does not show $vol_id[1] as creating");
-		return -1;
+		return undef;
 	} else {
 		sleep $vol_timeout;
 		if ( !$self->found( "$self->{TOOLKIT}describe-volumes", qr/$vol_id[1].*$zone.*available.*/ ) ) {
 			$self->fail("Unable to create volume");
-			return -1;
+			return undef;
 		} else {
 			$self->pass("Volume $vol_id[1] created properly");
 			return $vol_id[1];
@@ -1468,12 +1468,12 @@ sub delete_volume {
 
 	if ( !$self->found( "$self->{TOOLKIT}delete-volume $volume", qr/^VOLUME\s+$volume/ ) ) {
 		$self->fail("Failed to delete volume");
-		return -1;
+		return undef;
 	}
 	sleep 5;
 	if ( $self->found( "$self->{TOOLKIT}describe-volumes", qr/^VOLUME\s+$volume.*available/ ) ) {
 		$self->fail("After delete volume still available");
-		return -1;
+		return undef;
 	} else {
 		return $volume;
 	}
@@ -1487,17 +1487,17 @@ sub attach_volume {
 	my $device   = shift;
 	if ( !defined $volume || !defined $instance || !defined $device ) {
 		$self->fail("Missing parameters to EucaTest->attach_volume");
-		return -1;
+		return undef;
 	}
 
 	if ( !$self->found( "$self->{TOOLKIT}attach-volume $volume -i $instance -d $device", qr/^VOLUME\s+$volume/ ) ) {
 		$self->fail("Attachment failed");
-		return -1;
+		return undef;
 	}
 	sleep 10;
 	if ( !$self->found( "$self->{TOOLKIT}describe-volumes", qr/^VOLUME\s+$volume.*in-use/ ) ) {
 		$self->fail("Attachment not appearing in describe volumes as in use");
-		return -1;
+		return undef;
 	} else {
 		return $volume;
 	}
@@ -1509,12 +1509,12 @@ sub detach_volume {
 
 	if ( !$self->found( "$self->{TOOLKIT}detach-volume $volume", qr/^VOLUME\s$volume/ ) ) {
 		$self->fail("Detach command did not return correct status");
-		return -1;
+		return undef;
 	}
 	sleep 5;
 	if ( !$self->found( "$self->{TOOLKIT}describe-volumes", qr/^VOLUME\s+$volume.*available/ ) ) {
 		$self->fail("Volume still attached after 5 seconds");
-		return -1;
+		return undef;
 	}
 
 	return $volume;
@@ -1529,7 +1529,7 @@ sub create_snapshot {
 	### Check that there was output from the create command
 	if ( @create_output < 1 ) {
 		$self->fail("Create snapshot returned without output");
-		return -1;
+		return undef;
 	}
 	{
 		### If there was output check that it shows the SNAPSHOT as pending and the current percentage is increasing
@@ -1545,7 +1545,7 @@ sub create_snapshot {
 				my @snapshot_poll = $self->sys("euca-describe-snapshots | grep $snap_id");
 				if ( @snapshot_poll < 1 ) {
 					$self->fail("Did not find $snap_id in describe-snapshots");
-					return -1;
+					return undef;
 				}
 				my @snapshot_info  = split( / /, $snapshot_poll[0] );
 				my @new_percentage = split( /%/, $snapshot_info[5] );
@@ -1557,7 +1557,7 @@ sub create_snapshot {
 
 				} else {
 					$self->fail("Snapshot at same percentage after $poll_interval");
-					return -1;
+					return undef;
 				}
 
 			}
@@ -1567,12 +1567,12 @@ sub create_snapshot {
 				return $snap_id;
 			} else {
 				$self->fail("Snapshot creation failed");
-				return -1;
+				return undef;
 			}
 
 		} else {
 			$self->fail("Snapshot not in pending state after create");
-			return -1;
+			return undef;
 		}
 	}
 }
@@ -1583,17 +1583,17 @@ sub delete_snapshot {
 
 	if ( $snap !~ /snap-/ ) {
 		$self->fail("ERROR: invalid snapshot ID '$snap' for delete_snapshot");
-		return -1;
+		return undef;
 	}
 
 	my $cmd     = "$self->{TOOLKIT}delete-snapshot $snap";
 	my @del_out = $self->sys($cmd);
 	if ( @del_out < 1 ) {
 		$self->fail("Delete snapshot returned no output");
-		return -1;
+		return undef;
 	} elsif ( $del_out[0] !~ "snap-" ) {
 		$self->fail("Deleting snapshot did not return snap-id\n");
-		return -1;
+		return undef;
 	} else {
 
 	}
@@ -1610,7 +1610,7 @@ sub euare_create_account {
 	$self->sys("euare-accountcreate -a $new_account");
 	if ( !$self->found( "euare-accountlist", qr/^$new_account/ ) ) {
 		$self->fail("fail to add account $new_account");
-		return -1;
+		return undef;
 	}
 	return $new_account;
 }
@@ -1621,7 +1621,7 @@ sub euare_delete_account {
 	$self->sys("euare-accountdel -a $deleted_account -r");
 	if ( $self->found( "euare-accountlist", qr/^$deleted_account/ ) ) {
 		$self->fail("failed to delete account $deleted_account");
-		return -1;
+		return undef;
 	}
 	return $deleted_account;
 }
@@ -1640,7 +1640,7 @@ sub euare_create_user {
 	$self->sys("euare-usercreate -u $new_user -p $user_path");
 	if ( !$self->found( "euare-userlistbypath", qr/$new_user/ ) ) {
 		$self->fail("could not create new user arn:aws:iam::$account:user$user_path$new_user");
-		return -1;
+		return undef;
 	}
 	$self->pass("Created new user arn:aws:iam::$account:user$user_path$new_user ");
 	return $new_user;
@@ -1660,7 +1660,7 @@ sub euare_delete_user {
 	$self->sys("euare-userdel -ru $new_user");
 	if ( $self->found( "euare-userlistbypath", qr/arn:aws:iam::$account:user$user_path\/$new_user/ ) ) {
 		$self->fail("could not delete user $new_user\@$account");
-		return -1;
+		return undef;
 	}
 	return 0;
 }
@@ -1675,7 +1675,7 @@ sub euare_change_username {
 	$self->sys("euare-usermod -u $old_user_name --new-user-name=$new_user_name");
 	if ( !$self->found( "euare-userlistbypath", qr/arn:aws:iam::$account:user$path\/$new_user_name/ ) ) {
 		$self->fail("failed to change user name");
-		return -1;
+		return undef;
 	}
 	return $new_user_name;
 }
@@ -1694,7 +1694,7 @@ sub euare_clean_accounts {
 
 	if ( @accounts > 1 || !( $accounts[0] =~ /^eucalyptus/ ) ) {
 		$self->fail("failed to clean up accounts");
-		return -1;
+		return undef;
 	}
 	return 0;
 
@@ -1720,7 +1720,7 @@ sub euare_create_loginprofile {
 	$self->sys("euare-useraddloginprofile -u $user -p $password");
 	if ( !$self->found( "euare-usergetloginprofile -u $user", qr/^$user$/ ) ) {
 		$self->fail("failed to add password");
-		return -1;
+		return undef;
 	}
 	return 0;
 }
@@ -1732,7 +1732,7 @@ sub euare_delete_loginprofile {
 	$self->sys("euare-userdelloginprofile -u $user");
 	if ( $self->found( "euare-usergetloginprofile -u $user", qr/^$user$/ ) ) {
 		$self->fail("there should be no password");
-		return -1;
+		return undef;
 	}
 	return 0;
 
@@ -1746,7 +1746,7 @@ sub euare_add_userkey {
 	my @res = $self->sys("euare-userlistkeys -u $user");
 	if ( @res < 1 ) {
 		$self->fail("failed to add access key");
-		return -1;
+		return undef;
 	}
 
 	my $key = $res[0];
@@ -1755,12 +1755,12 @@ sub euare_add_userkey {
 	### ENSURE KEY IS FOUND
 	if ( !$self->found( "euare-userlistkeys -u $user", qr/$key/ ) ) {
 		$self->fail("failed to get user key");
-		return -1;
+		return undef;
 	}
 	$self->test_name("Check that key is active");
 	if ( !$self->found( "euare-userlistkeys -u $user", qr/Active/ ) ) {
 		$self->fail("wrong user key status");
-		return -1;
+		return undef;
 	}
 	return $key;
 
@@ -1774,7 +1774,7 @@ sub euare_deactivate_key {
 	$self->sys("euare-usermodkey -u $user -k $key -s Inactive");
 	if ( !$self->found( "euare-userlistkeys -u $user", qr/Inactive/ ) ) {
 		$self->fail("wrong user key status");
-		return -1;
+		return undef;
 	}
 	return 0;
 }
@@ -1788,7 +1788,7 @@ sub euare_delete_key {
 	$self->sys("euare-userdelkey -u $user -k $key");
 	if ( $self->found( "euare-userlistkeys -u $user", qr/$key/ ) ) {
 		$self->fail("failed to delete user key");
-		return -1;
+		return undef;
 	}
 	return 0;
 }
@@ -1802,20 +1802,20 @@ sub euare_create_cert {
 	my @res = $self->sys("euare-userlistcerts -u $user");
 	if ( @res < 1 ) {
 		$self->fail("failed to create certificate");
-		return -1;
+		return undef;
 	}
 	my $cert = $res[0];
 	chomp($cert);
 	$self->test_name("Check that certificate exists");
 	if ( !$self->found( "euare-userlistcerts -u $user", qr/$cert/ ) ) {
 		$self->fail("failed to get user cert");
-		return -1;
+		return undef;
 	}
 
 	$self->test_name("Check that cert is active");
 	if ( !$self->found( "euare-userlistcerts -u $user", qr/Active/ ) ) {
 		$self->fail("wrong user cert status");
-		return -1;
+		return undef;
 	}
 	return $cert;
 }
@@ -1829,7 +1829,7 @@ sub euare_deactviate_cert {
 	$self->sys("euare-usermodcert -u $user -c $cert -s Inactive");
 	if ( !$self->found( "euare-userlistcerts -u $user", qr/Inactive/ ) ) {
 		$self->fail("wrong user cert status");
-		return -1;
+		return undef;
 	}
 	return 0;
 }
@@ -1842,7 +1842,7 @@ sub euare_delete_cert {
 	$self->sys("euare-userdelcert -u $user -c $cert");
 	if ( $self->found( "euare-userlistcerts -u $user", qr/$cert/ ) ) {
 		$self->fail("failed to delete user cert");
-		return -1;
+		return undef;
 	}
 }
 
@@ -1861,13 +1861,13 @@ sub euare_add_certfromfile {
 	$self->test_name("Check that certificate exists");
 	if ( !$self->found( "euare-userlistcerts -u $user", qr/$cert/ ) ) {
 		$self->fail("failed to get user cert");
-		return -1;
+		return undef;
 	}
 
 	$self->test_name("Check that cert is active");
 	if ( !$self->found( "euare-userlistcerts -u $user", qr/Active/ ) ) {
 		$self->fail("wrong user cert status");
-		return -1;
+		return undef;
 	}
 	return $cert;
 }
@@ -1886,7 +1886,7 @@ sub euare_create_group {
 	$self->sys("euare-groupcreate -g $group -p $path");
 	if ( !$self->found( "euare-grouplistbypath", qr/arn:aws:iam::$account:group$path\/$group/ ) ) {
 		$self->fail("could not create new group $group");
-		return -1;
+		return undef;
 	}
 	return $group;
 }
@@ -1899,7 +1899,7 @@ sub euare_parse_arn {
 	my @group = $self->sys( "euare-" . $type . "listbypath | grep $name" );
 	if ( @group < 1 ) {
 		$self->fail("Unable to locate desired $type $name");
-		return -1;
+		return undef;
 	}
 	my @arn      = split( /:/, $group[0] );
 	my $pathindx = @arn - 1;
@@ -1935,11 +1935,11 @@ sub euare_modattr {
 	my $account = $self->get_currentaccount();
 	if ( !defined $type ) {
 		$self->fail("Required parameter type not provided to function euare_modattr");
-		return -1;
+		return undef;
 	}
 	if ( !defined $opts->{"path"} && !defined $opts->{"newname"} ) {
 		$self->fail("Required parameter path or name not provided to function euare_modattr");
-		return -1;
+		return undef;
 	}
 	my $path = $self->euare_parse_arn( $type, $name );
 	my $cmd = "euare-" . $type . "mod";

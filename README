@@ -26,9 +26,10 @@ CREATING YOUR LOCAL TEST CREATION ENVIRONMENT
 	 git clone https://viglesiasce@bitbucket.org/viglesiasce/eucatest.git
 	 mv eucatest EucaTest
 4) Download the run_instance.pl script from https://bitbucket.org/viglesiasce/eucatest/downloads/run_instance.pl
-5) Copy that file to test-area/stage and make it executable
-6) Run that file to ensure the environment has been setup properly
-7) If you are updating the EucaTest.pm library found in test-area/share/perl_lib/EucaTest/lib/EucaTest.pm
+5) Copy that file to test-area/stage and make it executable with 'chmod +x run_instance.pl'
+6) Download the sample_input.conf file from https://bitbucket.org/viglesiasce/eucatest/downloads/sample_input.conf and place it in test-area/input 
+7) Run that file to ensure the environment has been setup properly
+8) If you are updating the EucaTest.pm library found in test-area/share/perl_lib/EucaTest/lib/EucaTest.pm
 	- Ensure that before you commit you go to Source->Format in the Menu Bar to maintain style
 
 SAMPLE FIRST SCRIPT
