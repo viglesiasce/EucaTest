@@ -61,7 +61,10 @@ sub new {
 	if ( !defined $delay ) {
 		$delay = 1;
 	}
-
+	my $exit_on_fail = $opts->{'exit_on_fail'};
+	if ( !defined $exit_on_fail ) {
+		$exit_on_fail = 0;
+	}
 	my $timeout = $opts->{'timeout'};
 	if ( !defined $timeout ) {
 		$timeout = 120;
@@ -93,7 +96,7 @@ sub new {
 	} else {
 		$password = ":" . $password;
 	}
-	my $self = { SSH => $ssh, CREDPATH => $credpath, TIMEOUT => $timeout, STARTTIME => time(), EUCADIR => $eucadir, VERIFY_LEVEL => $verify_level, TOOLKIT => $toolkit, DELAY => $delay, FAIL_COUNT => $fail_count, INPUT_FILE => $input_file, PASSWORD => $password };
+	my $self = { SSH => $ssh, CREDPATH => $credpath, TIMEOUT => $timeout, EXITONFAIL => $exit_on_fail, STARTTIME => time(), EUCADIR => $eucadir, VERIFY_LEVEL => $verify_level, TOOLKIT => $toolkit, DELAY => $delay, FAIL_COUNT => $fail_count, INPUT_FILE => $input_file, PASSWORD => $password };
 	bless $self;
 	
 	$CLC_INFO = $self->read_input_file($input_file);
@@ -149,8 +152,11 @@ sub fail {
 	push( @running_log, "^^^^^^[TEST_REPORT] FAILED $message^^^^^^\n" );
 	print("^^^^^^[TEST_REPORT] FAILED $message^^^^^^\n");
 	$self->{FAIL_COUNT}++;
-
-	return 0;
+	if($self->{EXITONFAIL}){
+		exit(1);
+	}else{
+		return 0;
+	}
 }
 
 # Print formatted success message
@@ -2063,6 +2069,29 @@ sub euare_attach_policy_user{
 	}
 	
 }
+
+sub euare_detach_policy_user{
+	my $self = shift;
+	my $user = shift;
+	my $name = shift;
+	my $account = shift;
+	my $delegate = " ";
+	
+	if( !defined $account){
+		$account = $self->get_currentaccount();
+	}else{
+		$delegate .= "--delegate $account";
+	}
+	$self->test_name("Removing $name policy from $user");
+	$self->sys("euare-userdelpolicy -u $user -p $name " . $delegate);
+
+	$self->test_name("Check policy isnt active");
+	if ($self->found("euare-userlistpolicies -u $user" . $delegate, qr/$name/)) {
+	  $self->fail("failed to upload policy to user");
+	}
+	
+}
+
 sub euare_attach_policy_group{
 	my $self = shift;
 	my $group = shift;
