@@ -93,9 +93,9 @@ sub new {
 	} else {
 		$password = ":" . $password;
 	}
-	my $self = { SSH => $ssh, CREDPATH => $credpath, TIMEOUT => $timeout, EUCADIR => $eucadir, VERIFY_LEVEL => $verify_level, TOOLKIT => $toolkit, DELAY => $delay, FAIL_COUNT => $fail_count, INPUT_FILE => $input_file, PASSWORD => $password };
+	my $self = { SSH => $ssh, CREDPATH => $credpath, TIMEOUT => $timeout, STARTTIME => time(), EUCADIR => $eucadir, VERIFY_LEVEL => $verify_level, TOOLKIT => $toolkit, DELAY => $delay, FAIL_COUNT => $fail_count, INPUT_FILE => $input_file, PASSWORD => $password };
 	bless $self;
-
+	
 	$CLC_INFO = $self->read_input_file($input_file);
 	if ( !defined $host ) {
 		$host = "root" . $password . "\@" . $CLC_INFO->{'QA_IP'};
@@ -111,14 +111,14 @@ sub new {
 			#			 $self->test_name("Creating a keypair authenticated SSH connection to $host");
 			$ssh = Net::OpenSSH->new( $host, key_path => $keypath, master_opts => [ -o => "StrictHostKeyChecking=no" ] );
 			$self->{SSH} = $ssh;
-			print $ssh->error;
+			#print $ssh->error;
 
 		} else {
 
 			#			$self->test_name( "Creating a password authenticated SSH connection to $host");
 			$ssh = Net::OpenSSH->new( $host, master_opts => [ -o => "StrictHostKeyChecking=no" ] );
 			$self->{SSH} = $ssh;
-			print $ssh->error;
+			#print $ssh->error;
 		}
 	} else {
 		print "Creating a LOCAL connection\n";
@@ -188,6 +188,24 @@ sub tee {
 	return 0;
 }
 
+sub get_execution_time{
+	my $self= shift;
+	$self->test_name("This test took " . (time() - $self->{STARTTIME}) . "s to execute");
+	return 0;
+}
+
+sub do_exit{
+	my $self =shift;
+	my $fail_count = $self->get_fail_count();
+	$self->get_execution_time();
+	$self->test_name("Test ended with " . $fail_count . " failures.");
+	if ($fail_count){
+		exit(1);
+	}else{
+		exit(0);
+	}
+}
+
 sub generate_random_string {
 	my $self  = shift;
 	my $len   = shift;
@@ -197,6 +215,21 @@ sub generate_random_string {
 		$string .= $chars[ rand @chars ];
 	}
 	return $string;
+}
+
+sub generate_random_file{
+	my $self = shift;
+	my $name = shift;
+	my $size = shift;
+	if( !defined $name){
+		$name = "test_file";
+	}
+	if( !defined $size){
+		$size = 1;
+	}
+	my @output = $self->sys("dd if=/dev/random of=$name bs=1048576 count=$size");
+	
+	return $name;
 }
 
 sub get_fail_count {
@@ -751,6 +784,89 @@ sub send_cred {
 	my $host = shift;
 	$self->sys("scp -r $self->{CREDPATH} $host");
 	return $self->{CREDPATH};
+}
+
+sub get_access_key{
+	my $self = shift;
+	my $cred_path = shift;
+	if( !defined $cred_path){
+		$cred_path = $self->get_credpath();
+	}
+	
+	my @access_key = $self->sys("cat $cred_path/eucarc | grep export | grep ACCESS | awk \'BEGIN { FS = \"=\" } ; { print \$2 }\' ");
+	$access_key[0] =~ s/'//g;
+	return $access_key[0];
+}
+
+sub get_secret_key{
+	my $self = shift;
+	my $cred_path = shift;
+	if( !defined $cred_path){
+		$cred_path = $self->get_credpath();
+	}
+	
+	my @secret_key = $self->sys("cat $cred_path/eucarc | grep export | grep SECRET | awk \'BEGIN { FS = \"=\" } ; { print \$2 }\' ");
+	$secret_key[0] =~ s/'//g;
+	return $secret_key[0];
+}
+
+sub setup_s3cfg{
+	my $self = shift;
+	my $credpath = shift;
+	my $cfg_template = <<CFG;
+[default]
+access_key = ACCESSKEY
+acl_public = False
+bucket_location = US
+debug_syncmatch = False
+default_mime_type = binary/octet-stream
+delete_removed = False
+dry_run = False
+encrypt = False
+force = False
+gpg_command = /usr/bin/gpg
+gpg_decrypt = %(gpg_command)s -d --verbose --no-use-agent --batch --yes --passphrase-fd %(passphrase_fd)s -o %(output_file)s %(input_file)s
+gpg_encrypt = %(gpg_command)s -c --verbose --no-use-agent --batch --yes --passphrase-fd %(passphrase_fd)s -o %(output_file)s %(input_file)s
+gpg_passphrase = 
+guess_mime_type = False
+host_base = HOSTNAME:8773 
+host_bucket = HOSTNAME:8773
+service_path = /services/Walrus
+human_readable_sizes = False
+preserve_attrs = True
+proxy_host = 
+proxy_port = 0
+recv_chunk = 4096
+secret_key = SECRET
+send_chunk = 4096
+use_https = False
+verbosity = WARNING
+
+CFG
+	my @clc = $self->get_machines('clc');
+	my $frontend_ip = $clc[0]->{'ip'};
+	my $access = $self->get_access_key($credpath);
+	chomp($access);
+	my $secret = $self->get_secret_key($credpath);
+	chomp($secret);
+	$cfg_template =~ s/ACCESSKEY/$access/g;
+	$cfg_template =~ s/SECRET/$secret/g;
+	$cfg_template =~ s/HOSTNAME/$frontend_ip/g;
+	my $filename = "s3.cfg";
+	open S3CFG, ">$filename" or die $!;
+	print S3CFG $cfg_template;
+	close S3CFG;
+	return $filename;
+
+}
+
+sub sync_keys{
+	my $self = shift;
+	my $host = shift;
+	my $password = shift;
+	my @local_key = `cat ~/.ssh/id_rsa.pub`;
+	$self->sys("echo \'$local_key[0]\' >> ~/.ssh/authorized_keys");
+	return 0;
 }
 
 sub add_keypair {
@@ -1631,14 +1747,20 @@ sub euare_create_user {
 	my $new_user  = shift;
 	my $account   = shift;
 	my $user_path = shift;
+	
+	my $delegate = " ";
 	if ( !defined $user_path ) {
 		$user_path = "/";
 	}
 	if ( !defined $account ) {
 		$account = "eucalyptus";
+	}else{
+		$delegate .= "--delegate $account";
 	}
-	$self->sys("euare-usercreate -u $new_user -p $user_path");
-	if ( !$self->found( "euare-userlistbypath", qr/$new_user/ ) ) {
+	my $cmd = "euare-usercreate -u $new_user -p $user_path" . $delegate;
+	$self->sys($cmd);
+	
+	if ( !$self->found( "euare-userlistbypath" . $delegate, qr/$new_user/ ) ) {
 		$self->fail("could not create new user arn:aws:iam::$account:user$user_path$new_user");
 		return undef;
 	}
@@ -1882,14 +2004,90 @@ sub euare_create_group {
 	my $self    = shift;
 	my $group   = shift;
 	my $path    = shift;
-	my $account = $self->get_currentaccount();
-	$self->sys("euare-groupcreate -g $group -p $path");
-	if ( !$self->found( "euare-grouplistbypath", qr/arn:aws:iam::$account:group$path\/$group/ ) ) {
+	my $account = shift;
+	my $delegate = " ";
+	my $cmd = "euare-groupcreate -g $group -p $path";
+	if( !defined $account){
+		$account = $self->get_currentaccount();
+	}else{
+		$delegate .= "--delegate $account";
+	}
+		
+	$self->sys($cmd . $delegate);
+	if ( !$self->found( "euare-grouplistbypath" . $delegate, qr/arn:aws:iam::$account:group$path$group/ ) ) {
 		$self->fail("could not create new group $group");
 		return undef;
 	}
 	return $group;
 }
+
+sub euare_group_add_user{
+	my $self = shift;
+	my $group = shift;
+	my $user = shift;
+	my $account = shift;
+	my $delegate = "";
+	my $cmd = "euare-groupadduser -g $group -u $user";
+	if( defined $account){
+		$delegate .= " --delegate $account";
+	}
+	my @adduser_return = $self->sys($cmd . $delegate);
+	if( @adduser_return > 0){
+		$self->fail("Could not add user to group");
+		return undef;
+	}else{
+		return 0;
+	}
+	
+}
+
+sub euare_attach_policy_user{
+	my $self = shift;
+	my $user = shift;
+	my $name = shift;
+	my $file = shift;
+	my $account = shift;
+	my $delegate = " ";
+	
+	if( !defined $account){
+		$account = $self->get_currentaccount();
+	}else{
+		$delegate .= "--delegate $account";
+	}
+	$self->test_name("Add a user policy");
+	$self->sys("euare-useruploadpolicy -u $user -p $name -f $file" . $delegate);
+
+	$self->test_name("Check policy is active");
+	if (!$self->found("euare-userlistpolicies -u $user" . $delegate, qr/$name/)) {
+	  $self->fail("failed to upload policy to user");
+	}
+	
+}
+sub euare_attach_policy_group{
+	my $self = shift;
+	my $group = shift;
+	my $name = shift;
+	my $file = shift;
+	my $account = shift;
+	my $delegate = " ";
+	
+	if( !defined $account){
+		$account = $self->get_currentaccount();
+	}else{
+		$delegate .= "--delegate $account";
+	}
+	
+	
+	$self->test_name("Add a group policy");
+	$self->sys("euare-groupuploadpolicy -g $group -p $name -f $file" . $delegate);
+
+	$self->test_name("Check policy is active");
+	if (!$self->found("euare-grouplistpolicies -g $group" . $delegate, qr/$name/)) {
+	  $self->fail("failed to upload policy to group");
+	}
+	
+}
+
 
 sub euare_parse_arn {
 	my $self = shift;
