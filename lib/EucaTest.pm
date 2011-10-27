@@ -1659,7 +1659,7 @@ sub create_snapshot {
 	{
 		### If there was output check that it shows the SNAPSHOT as pending and the current percentage is increasing
 		if ( $create_output[0] =~ /^SNAPSHOT.*pending/ ) {
-			my @snapshot_info = split( / /, $create_output[0] );
+			my @snapshot_info = split( /\s+/, $create_output[0] );
 			my $snap_id = $snapshot_info[1];
 			$self->pass("Snapshot $snap_id being created and in pending state");
 			my $old_percentage = 0;
