@@ -74,7 +74,10 @@ sub new {
 	if ( !defined $eucadir ) {
 		$eucadir = "/opt/eucalyptus";
 	}
-
+	my $creds = $opts->{'creds'};
+	if ( !defined $creds ) {
+		$creds = 1;
+	}
 	my $verify_level = $opts->{'verifylevel'};
 	if ( !defined $verify_level ) {
 		$verify_level = "10";
@@ -112,14 +115,14 @@ sub new {
 			chomp $keypath;
 
 			#			 $self->test_name("Creating a keypair authenticated SSH connection to $host");
-			$ssh = Net::OpenSSH->new( $host, key_path => $keypath, master_opts => [ -o => "StrictHostKeyChecking=no" ] );
+			$ssh = Net::OpenSSH->new( $host, key_path => $keypath, master_opts => [-o => "StrictHostKeyChecking=no"] );
 			$self->{SSH} = $ssh;
 			#print $ssh->error;
 
 		} else {
 
 			#			$self->test_name( "Creating a password authenticated SSH connection to $host");
-			$ssh = Net::OpenSSH->new( $host, master_opts => [ -o => "StrictHostKeyChecking=no" ] );
+			$ssh = Net::OpenSSH->new( $host, master_opts => [-o => "StrictHostKeyChecking=no"] );
 			$self->{SSH} = $ssh;
 			#print $ssh->error;
 		}
@@ -129,7 +132,7 @@ sub new {
 	}
 
 	### IF we dont have credentials and are sshing to a remote host, get credentials
-	if ( defined $ssh && $self->get_credpath eq "" ) {
+	if ( defined $ssh && $self->get_credpath eq "" &&  $creds == 1) {
 		my $admin_credpath = $self->get_cred( "eucalyptus", "admin" );
 		if ( $admin_credpath !~ /eucarc/ ) {
 			$self->fail("Failed to download credentials");
@@ -1525,7 +1528,7 @@ sub reboot_instance {
 	my $self        = shift;
 	my $instance_id = shift;
 	my $instance    = $self->get_instance_info($instance_id);
-	my $ip          = $instance->{'ip'};
+	my $ip          = $instance->{'pub-ip'};
 	my $keypair     = $instance->{'keypair'};
 	my @uptime_old  = $self->sys("ssh root\@$ip -i $keypair.priv \"cat /proc/uptime | awk \'{print \$1}\'\"");
 	my @output      = $self->sys("$self->{TOOLKIT}reboot-instances $instance_id");
@@ -2066,6 +2069,8 @@ sub euare_attach_policy_user{
 	$self->test_name("Check policy is active");
 	if (!$self->found("euare-userlistpolicies -u $user" . $delegate, qr/$name/)) {
 	  $self->fail("failed to upload policy to user");
+	}else{
+		$self->sys("euare-usergetpolicy -u $user -p $name" . $delegate);
 	}
 	
 }
@@ -2113,6 +2118,8 @@ sub euare_attach_policy_group{
 	$self->test_name("Check policy is active");
 	if (!$self->found("euare-grouplistpolicies -g $group" . $delegate, qr/$name/)) {
 	  $self->fail("failed to upload policy to group");
+	}else{
+		$self->sys("euare-groupgetpolicy -g $group -p $name" . $delegate);
 	}
 	
 }
