@@ -155,6 +155,12 @@ sub fail {
 	push( @running_log, "^^^^^^[TEST_REPORT] FAILED $message^^^^^^\n" );
 	print("^^^^^^[TEST_REPORT] FAILED $message^^^^^^\n");
 	$self->{FAIL_COUNT}++;
+	
+	if( 0 ){
+		sleep 2;
+		print $self->sys("tail -100 " . $self->get_eucadir() . "/var/log/eucalyptus/cloud-output.log");
+	}
+	
 	if($self->{EXITONFAIL}){
 		exit(1);
 	}else{
@@ -208,7 +214,9 @@ sub do_exit{
 	my $fail_count = $self->get_fail_count();
 	$self->get_execution_time();
 	$self->test_name("Test ended with " . $fail_count . " failures.");
-	if ($fail_count){
+	$self->cleanup();
+	if ($fail_count > 0){
+		
 		exit(1);
 	}else{
 		exit(0);
@@ -2096,6 +2104,20 @@ sub euare_detach_policy_user{
 	}
 	
 }
+sub euare_detach_policy_account{
+	my $self = shift;
+	my $account = shift;
+	my $name = shift;
+
+	$self->test_name("Removing $name policy from $account");
+	$self->sys("euare-accountdelpolicy -a $account -p $name ");
+
+	$self->test_name("Check policy isnt active");
+	if ($self->found("euare-accountlistpolicies -a $account", qr/$name/)) {
+	  $self->fail("failed to remove policy from account");
+	}
+	
+}
 
 sub euare_attach_policy_group{
 	my $self = shift;
@@ -2123,7 +2145,29 @@ sub euare_attach_policy_group{
 	}
 	
 }
+sub euare_attach_policy_account{
+	my $self = shift;
+	my $account = shift;
+	my $name = shift;
+	my $file = shift;
+	my $delegate = " ";
+	
+	if( !defined $account){
+		$self->fail("No account name provided to attach_policy_account");
+	}
+	
+	
+	$self->test_name("Add an account policy");
+	$self->sys("euare-accountuploadpolicy -a $account -p $name -f $file" );
 
+	$self->test_name("Check policy is active");
+	if (!$self->found("euare-accountlistpolicies -a $account", qr/$name/)) {
+	  $self->fail("failed to upload policy to group");
+	}else{
+		$self->sys("euare-accountgetpolicy -a $account -p $name" );
+	}
+	
+}
 
 sub euare_parse_arn {
 	my $self = shift;
