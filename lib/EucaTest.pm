@@ -245,7 +245,7 @@ sub generate_random_file{
 	if( !defined $size){
 		$size = 1;
 	}
-	my @output = $self->sys("dd if=/dev/zero of=$name bs=1048576 count=$size");
+	my @output = $self->sys("dd if=/dev/urandom of=$name bs=1048576 count=$size");
 	
 	return $name;
 }
