@@ -115,14 +115,14 @@ sub new {
 			chomp $keypath;
 
 			#			 $self->test_name("Creating a keypair authenticated SSH connection to $host");
-			$ssh = Net::OpenSSH->new( $host, key_path => $keypath, master_opts => [-o => "StrictHostKeyChecking=no"] );
+			$ssh = Net::OpenSSH->new( $host, key_path => $keypath, master_opts => [-o => "StrictHostKeyChecking=no" , -o => "UserKnownHostsFile=/dev/null"] );
 			$self->{SSH} = $ssh;
 			#print $ssh->error;
 
 		} else {
 
 			#			$self->test_name( "Creating a password authenticated SSH connection to $host");
-			$ssh = Net::OpenSSH->new( $host, master_opts => [-o => "StrictHostKeyChecking=no"] );
+			$ssh = Net::OpenSSH->new( $host, master_opts => [-o => "StrictHostKeyChecking=no", -o => "UserKnownHostsFile=/dev/null"] );
 			$self->{SSH} = $ssh;
 			#print $ssh->error;
 		}
