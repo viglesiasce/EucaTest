@@ -34,7 +34,7 @@ our $VERSION = '0.01';
 our $ofile   = "ubero";
 my $CLC_INFO = {};
 my @running_log;
-
+my @failure_log;
 # timeouts
 my $INST_AVAILABLE_TIMEOUT_SEC = 20;
 my $INST_IP_TIMEOUT_SEC        = 20;
@@ -155,7 +155,7 @@ sub fail {
 	push( @running_log, "^^^^^^[TEST_REPORT] FAILED $message^^^^^^\n" );
 	print("^^^^^^[TEST_REPORT] FAILED $message^^^^^^\n");
 	$self->{FAIL_COUNT}++;
-	
+	push(@failure_log, $message . "\n");
 	if( 0 ){
 		sleep 2;
 		print $self->sys("tail -100 " . $self->get_eucadir() . "/var/log/eucalyptus/cloud-output.log");
@@ -214,6 +214,7 @@ sub do_exit{
 	my $fail_count = $self->get_fail_count();
 	$self->get_execution_time();
 	$self->test_name("Test ended with " . $fail_count . " failures.");
+	print "@failure_log";
 	$self->cleanup();
 	if ($fail_count > 0){
 		
