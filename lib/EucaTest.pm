@@ -482,7 +482,7 @@ sub update_testlink {
 	my $previous_timeout = $self->get_timeout();
 	$self->set_timeout(60);
 	my @scp_result = $self->sys("scp $run_file root\@192.168.51.187:artifacts/$run_file");
-	$self->set_timeout($previous_timeout);
+	
 
 	#print "@scp_result";
 
@@ -544,6 +544,7 @@ sub update_testlink {
 	##UPLOADING THE TC RESULT WILL RETURN ME THE EXEC ID
 
 	$self->sys("rm $run_file");
+	$self->set_timeout($previous_timeout);
 	print "Updated Testcase: $tc_id in Testplan $tplan_id with result $status on build $build_id which is revno $build and exec_id \n";
 	return $exec_resp[0];
 }
@@ -562,10 +563,9 @@ sub attach_artifacts {
 	my @mkdir_artifacts_response = $self->sys("ssh root\@192.168.51.187 -o StrictHostKeyChecking=no \'mkdir artifacts\'");
 	my @mkdir_execid_response    = $self->sys("ssh root\@192.168.51.187 -o StrictHostKeyChecking=no \'mkdir artifacts/$exec_id\'");
 	my @scp_artifacts_result     = $self->sys("scp ../artifacts/*.out root\@192.168.51.187:artifacts/$exec_id");
-	$self->set_timeout($previous_timeout);
 	## LOOK FOR ALL THE REMOTE ARTIFACTS UPLOADED
 	my @remote_artifacts = $self->sys("ssh root\@192.168.51.187 -o StrictHostKeyChecking=no \'ls artifacts/$exec_id\'");
-
+    
 	foreach my $artifact (@remote_artifacts) {
 		chomp $artifact;
 		### SKIP IF ITS NOT A RUN SCRIPT
@@ -576,6 +576,7 @@ sub attach_artifacts {
 
 	##DELETE ARTICACTS AFTER UPLOAD
 	my @remove_artifacts = $self->sys("ssh root\@192.168.51.187 -o StrictHostKeyChecking=no \'rm -rf artifacts/$exec_id\'");
+	$self->set_timeout($previous_timeout);
 	return 0;
 }
 
@@ -657,7 +658,7 @@ sub read_input_file {
 	my $memo     = "";
 	my %CONFIG;
 	open( INPUT, "< $filename" ) || die $!;
-
+    my $clc_found = 0;
 	my $line;
 	while ( $line = <INPUT> ) {
 		$CONFIG{'INPUT_FILE'} .= $line;
@@ -706,7 +707,7 @@ sub read_input_file {
 			my $qa_roll       = $6;
 
 			my $this_roll = lc($6);
-			if ( $this_roll =~ /clc/ ) {
+			if ( $this_roll =~ /clc/ && $clc_found == 0) {
 				print "\n";
 				$CONFIG{'QA_DISTRO'}     = $qa_distro;
 				$CONFIG{'QA_DISTRO_VER'} = $qa_distro_ver;
@@ -715,6 +716,7 @@ sub read_input_file {
 				$CONFIG{'QA_ROLL'}       = $qa_roll;
 				$CONFIG{'QA_IP'}         = $qa_ip;
 				print "IP $qa_ip [CLC Distro: $qa_distro CLC Version: $qa_distro_ver CLC ARCH $qa_arch] is built from $qa_source as Eucalyptus-$qa_roll\n";
+				$clc_found = 1;
 			} elsif ( $this_roll =~ /nc/ ) {
 
 				$CONFIG{'NODE_DISTRO'}     = $qa_distro;
@@ -1689,7 +1691,7 @@ sub create_snapshot {
 					$self->fail("Did not find $snap_id in describe-snapshots");
 					return undef;
 				}
-				my @snapshot_info  = split( / /, $snapshot_poll[0] );
+				my @snapshot_info  = split( /\s+/, $snapshot_poll[0] );
 				my @new_percentage = split( /%/, $snapshot_info[5] );
 				if ( $new_percentage[0] > $old_percentage ) {
 					$self->test_name("Snapshot went from $old_percentage to $new_percentage[0]");
