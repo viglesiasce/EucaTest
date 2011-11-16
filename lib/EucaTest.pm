@@ -66,6 +66,10 @@ sub new {
 	if ( !defined $exit_on_fail ) {
 		$exit_on_fail = 0;
 	}
+	my $no_fail = $opts->{'no_fail'};
+	if ( !defined $no_fail ) {
+        $no_fail = 0;
+    }
 	my $timeout = $opts->{'timeout'};
 	if ( !defined $timeout ) {
 		$timeout = 120;
@@ -100,7 +104,7 @@ sub new {
 	} else {
 		$password = ":" . $password;
 	}
-	my $self = { SSH => $ssh, CREDPATH => $credpath, TIMEOUT => $timeout, EXITONFAIL => $exit_on_fail, STARTTIME => time(), EUCADIR => $eucadir, VERIFY_LEVEL => $verify_level, TOOLKIT => $toolkit, DELAY => $delay, FAIL_COUNT => $fail_count, INPUT_FILE => $input_file, PASSWORD => $password };
+	my $self = { SSH => $ssh, CREDPATH => $credpath, TIMEOUT => $timeout, EXITONFAIL => $exit_on_fail, NOFAIL => $no_fail, STARTTIME => time(), EUCADIR => $eucadir, VERIFY_LEVEL => $verify_level, TOOLKIT => $toolkit, DELAY => $delay, FAIL_COUNT => $fail_count, INPUT_FILE => $input_file, PASSWORD => $password };
 	bless $self;
 
 	$CLC_INFO = $self->read_input_file($input_file);
@@ -154,11 +158,12 @@ sub new {
 sub fail {
 	my $self    = shift;
 	my $message = shift;
-
-	push( @running_log, "^^^^^^[TEST_REPORT] FAILED $message^^^^^^\n" );
-	print("^^^^^^[TEST_REPORT] FAILED $message^^^^^^\n");
-	$self->{FAIL_COUNT}++;
-	push( @failure_log, $message . "\n" );
+    if(!$self->{NOFAIL}){
+	   push( @running_log, "^^^^^^[TEST_REPORT] FAILED $message^^^^^^\n" );
+	   print("^^^^^^[TEST_REPORT] FAILED $message^^^^^^\n");
+	   $self->{FAIL_COUNT}++;
+	   push( @failure_log, $message . "\n" );
+    }
 	if (0) {
 		sleep 2;
 		print $self->sys( "tail -100 " . $self->get_eucadir() . "/var/log/eucalyptus/cloud-output.log" );
@@ -1668,7 +1673,7 @@ sub create_snapshot {
 	my $self          = shift;
 	my $volume        = shift;
 	my @create_output = $self->sys("euca-create-snapshot $volume");
-	my $poll_interval = 20;
+	my $poll_interval = 30;
 	my $poll_count    = 15;
 	### Check that there was output from the create command
 	if ( @create_output < 1 ) {
