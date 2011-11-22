@@ -1558,8 +1558,8 @@ sub reboot_instance {
 	my @output      = $self->sys("$self->{TOOLKIT}reboot-instances $instance_id");
 	sleep 80;
 	my @uptime_new = $self->sys("ssh root\@$ip -i $keypair.priv \"cat /proc/uptime | awk \'{print \$1}\'\"");
-
-	if ( $uptime_old[0] > $uptime_new[0] ) {
+    
+	if ( int($uptime_old[0]) > int($uptime_new[0]) ) {
 		$self->pass("Instance rebooted. Old uptime: $uptime_old[0]  New uptime:  $uptime_new[0]");
 		return $instance_id;
 	} else {
