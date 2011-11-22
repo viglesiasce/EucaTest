@@ -7,7 +7,7 @@ use warnings;
 use Net::OpenSSH;
 require Exporter;
 use Data::Dumper;
-
+use Term::ANSIColor;
 our @ISA = qw(Exporter);
 
 # Items to export into callers namespace by default. Note: do not export
@@ -160,7 +160,9 @@ sub fail {
 	my $message = shift;
     if(!$self->{NOFAIL}){
 	   push( @running_log, "^^^^^^[TEST_REPORT] FAILED $message^^^^^^\n" );
+	   print color 'red';
 	   print("^^^^^^[TEST_REPORT] FAILED $message^^^^^^\n");
+	   print color 'reset';
 	   $self->{FAIL_COUNT}++;
 	   push( @failure_log, $message . "\n" );
     }
