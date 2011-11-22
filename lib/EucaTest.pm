@@ -160,7 +160,7 @@ sub fail {
 	my $message = shift;
     if(!$self->{NOFAIL}){
 	   push( @running_log, "^^^^^^[TEST_REPORT] FAILED $message^^^^^^\n" );
-	   print color 'red';
+	   print color 'bright_red';
 	   print("^^^^^^[TEST_REPORT] FAILED $message^^^^^^\n");
 	   print color 'reset';
 	   $self->{FAIL_COUNT}++;
