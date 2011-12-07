@@ -1458,7 +1458,7 @@ sub terminate_instance {
 		return undef;
 	}
 	if ( $output[0] =~ /$instance_id/ ) {
-		sleep 30;
+		sleep 40;
 		my @describe_instances = $self->sys("$self->{TOOLKIT}describe-instances | grep $instance_id");
 		if ( @describe_instances < 1 ) {
 			$self->fail("After terminating instance it is no longer found in the describe instances output");
@@ -1621,7 +1621,7 @@ sub delete_volume {
 		$self->fail("Failed to delete volume");
 		return undef;
 	}
-	sleep 5;
+	sleep 10;
 	if ( $self->found( "$self->{TOOLKIT}describe-volumes", qr/^VOLUME\s+$volume.*available/ ) ) {
 		$self->fail("After delete volume still available");
 		return undef;
