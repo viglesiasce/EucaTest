@@ -479,9 +479,7 @@ sub update_testlink {
 	open FILE, ">", "$run_file" or die $!;
 	print FILE"@running_log";
 	close FILE;
-	my $previous_timeout = $self->get_timeout();
-	$self->set_timeout(60);
-	my @scp_result = $self->sys("scp $run_file root\@192.168.51.187:artifacts/$run_file");
+	my @scp_result = $self->sys("scp $run_file root\@192.168.51.187:artifacts/$run_file", 120, 0);
 	
 
 	#print "@scp_result";
@@ -531,20 +529,19 @@ sub update_testlink {
 	chomp($tplan_id);
 
 	#################################
-	my @mkdir_artifacts_response = $self->sys("ssh root\@192.168.51.187 -o StrictHostKeyChecking=no \'mkdir artifacts\'");
-	my @build_response           = $self->sys("ssh root\@192.168.51.187 -o StrictHostKeyChecking=no \'./testlink/update_build.pl testplanid=$tplan_id \"$build\"'");
+	my @mkdir_artifacts_response = $self->sys("ssh root\@192.168.51.187 -o StrictHostKeyChecking=no \'mkdir artifacts\'", 120, 0);
+	my @build_response           = $self->sys("ssh root\@192.168.51.187 -o StrictHostKeyChecking=no \'./testlink/update_build.pl testplanid=$tplan_id \"$build\"'", 120, 0);
 	my $build_id                 = $build_response[0];
 	chomp($build_id);
-	my @exec_resp = $self->sys("ssh root\@192.168.51.187 -o StrictHostKeyChecking=no \'./testlink/update_testcase.pl artifacts/$run_file testcaseexternalid=$tc_id,testplanid=$tplan_id,status=$status,buildid=$build_id,platformid=$platform\'");
+	my @exec_resp = $self->sys("ssh root\@192.168.51.187 -o StrictHostKeyChecking=no \'./testlink/update_testcase.pl artifacts/$run_file testcaseexternalid=$tc_id,testplanid=$tplan_id,status=$status,buildid=$build_id,platformid=$platform\'", 120, 0);
 	if ( @exec_resp < 1 ) {
 		print "Could not update testcase in testplan";
 		return undef;
 	}
-	my @rm_resp = $self->sys("ssh root\@192.168.51.187 -o StrictHostKeyChecking=no \'rm artifacts/$run_file \'");
+	my @rm_resp = $self->sys("ssh root\@192.168.51.187 -o StrictHostKeyChecking=no \'rm artifacts/$run_file \'", 120, 0);
 	##UPLOADING THE TC RESULT WILL RETURN ME THE EXEC ID
 
-	$self->sys("rm $run_file");
-	$self->set_timeout($previous_timeout);
+	$self->sys("rm $run_file", 120, 0);
 	print "Updated Testcase: $tc_id in Testplan $tplan_id with result $status on build $build_id which is revno $build and exec_id \n";
 	return $exec_resp[0];
 }
@@ -558,25 +555,22 @@ sub attach_artifacts {
 	}
 	chomp $exec_id;
 	## SEND THE ARTIFACTS TO THE REMOTE MACHINE
-	my $previous_timeout = $self->get_timeout();
-	$self->set_timeout(60);
-	my @mkdir_artifacts_response = $self->sys("ssh root\@192.168.51.187 -o StrictHostKeyChecking=no \'mkdir artifacts\'");
-	my @mkdir_execid_response    = $self->sys("ssh root\@192.168.51.187 -o StrictHostKeyChecking=no \'mkdir artifacts/$exec_id\'");
-	my @scp_artifacts_result     = $self->sys("scp ../artifacts/*.out root\@192.168.51.187:artifacts/$exec_id");
+	my @mkdir_artifacts_response = $self->sys("ssh root\@192.168.51.187 -o StrictHostKeyChecking=no \'mkdir artifacts\'", 120, 0);
+	my @mkdir_execid_response    = $self->sys("ssh root\@192.168.51.187 -o StrictHostKeyChecking=no \'mkdir artifacts/$exec_id\'", 120, 0);
+	my @scp_artifacts_result     = $self->sys("scp ../artifacts/*.out root\@192.168.51.187:artifacts/$exec_id", 120, 0);
 	## LOOK FOR ALL THE REMOTE ARTIFACTS UPLOADED
-	my @remote_artifacts = $self->sys("ssh root\@192.168.51.187 -o StrictHostKeyChecking=no \'ls artifacts/$exec_id\'");
+	my @remote_artifacts = $self->sys("ssh root\@192.168.51.187 -o StrictHostKeyChecking=no \'ls artifacts/$exec_id\'", 120, 0);
     
 	foreach my $artifact (@remote_artifacts) {
 		chomp $artifact;
 		### SKIP IF ITS NOT A RUN SCRIPT
 		if ( $artifact =~ /run-script/ ) {
-			my @exec_resp = $self->sys("ssh root\@192.168.51.187 -o StrictHostKeyChecking=no \'./testlink/upload_attachment.pl artifacts/$exec_id/$artifact filename=$artifact,filetype=text/html,executionid=$exec_id\'");
+			my @exec_resp = $self->sys("ssh root\@192.168.51.187 -o StrictHostKeyChecking=no \'./testlink/upload_attachment.pl artifacts/$exec_id/$artifact filename=$artifact,filetype=text/html,executionid=$exec_id\'", 120, 0);
 		}
 	}
 
 	##DELETE ARTICACTS AFTER UPLOAD
-	my @remove_artifacts = $self->sys("ssh root\@192.168.51.187 -o StrictHostKeyChecking=no \'rm -rf artifacts/$exec_id\'");
-	$self->set_timeout($previous_timeout);
+	my @remove_artifacts = $self->sys("ssh root\@192.168.51.187 -o StrictHostKeyChecking=no \'rm -rf artifacts/$exec_id\'", 120, 0);
 	return 0;
 }
 
@@ -597,6 +591,7 @@ sub sys {
 	my $self         = shift;
 	my $cmd          = shift;
 	my $timeout      = shift;
+	my $verbose      = shift;
 	my $original_cmd = $cmd;
 	if ( $self->{CREDPATH} ne "" ) {
 		$cmd = ". " . $self->{CREDPATH} . "/eucarc && " . $cmd;
@@ -609,7 +604,9 @@ sub sys {
 	} else {
 		$systimeout = $self->{TIMEOUT};
 	}
-
+    if ( ! defined $verbose ) {
+        $verbose = 1;
+    }
 	my @output;
 
 	# Return and print failure
@@ -622,14 +619,17 @@ sub sys {
 		if ( defined $self->{SSH} ) {
 			my $rem_host = $self->{SSH}->get_host();
 			my $rem_user = $self->{SSH}->get_user();
-			$self->tee("[$rem_user\@$rem_host - $timestamp] $original_cmd\n");
+			if( $verbose ){
+			     $self->tee("[$rem_user\@$rem_host - $timestamp] $original_cmd\n");
+			}
 			@output = $self->{SSH}->capture($cmd);
 
 			#$self->{SSH}->error and $self->fail( "SSH ERROR: " . $self->{SSH}->error);
 
 		} else {
-
-			$self->tee("[LOCAL - $timestamp] $original_cmd\n");
+            if( $verbose ){
+			 $self->tee("[LOCAL - $timestamp] $original_cmd\n");
+            }
 			@output = `$cmd`;
 
 		}
@@ -640,11 +640,14 @@ sub sys {
 		die unless $@ eq "alarm\n";    # propagate unexpected errors
 		                               # timed out
 		$self->tee("@output\n");
-		$self->fail("Timeout occured after $systimeout seconds\n");
-
+		if( $verbose ){
+		  $self->fail("Timeout occured after $systimeout seconds\n");
+		}
 		return @output;
 	} else {                           # didn't
-		$self->tee("@output\n");
+	   if( $verbose ){
+		  $self->tee("@output\n");
+	   }
 		return @output;
 
 	}
