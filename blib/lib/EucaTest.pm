@@ -35,6 +35,7 @@ our $ofile   = "ubero";
 my $CLC_INFO = {};
 my @running_log;
 my @failure_log;
+
 # timeouts
 my $INST_AVAILABLE_TIMEOUT_SEC = 20;
 my $INST_IP_TIMEOUT_SEC        = 20;
@@ -101,7 +102,7 @@ sub new {
 	}
 	my $self = { SSH => $ssh, CREDPATH => $credpath, TIMEOUT => $timeout, EXITONFAIL => $exit_on_fail, STARTTIME => time(), EUCADIR => $eucadir, VERIFY_LEVEL => $verify_level, TOOLKIT => $toolkit, DELAY => $delay, FAIL_COUNT => $fail_count, INPUT_FILE => $input_file, PASSWORD => $password };
 	bless $self;
-	
+
 	$CLC_INFO = $self->read_input_file($input_file);
 	if ( !defined $host ) {
 		$host = "root" . $password . "\@" . $CLC_INFO->{'QA_IP'};
@@ -115,15 +116,17 @@ sub new {
 			chomp $keypath;
 
 			#			 $self->test_name("Creating a keypair authenticated SSH connection to $host");
-			$ssh = Net::OpenSSH->new( $host, key_path => $keypath, master_opts => [-o => "StrictHostKeyChecking=no" , -o => "UserKnownHostsFile=/dev/null"] );
+			$ssh = Net::OpenSSH->new( $host, key_path => $keypath, master_opts => [ -o => "StrictHostKeyChecking=no", -o => "UserKnownHostsFile=/dev/null" ] );
 			$self->{SSH} = $ssh;
+
 			#print $ssh->error;
 
 		} else {
 
 			#			$self->test_name( "Creating a password authenticated SSH connection to $host");
-			$ssh = Net::OpenSSH->new( $host, master_opts => [-o => "StrictHostKeyChecking=no", -o => "UserKnownHostsFile=/dev/null"] );
+			$ssh = Net::OpenSSH->new( $host, master_opts => [ -o => "StrictHostKeyChecking=no", -o => "UserKnownHostsFile=/dev/null" ] );
 			$self->{SSH} = $ssh;
+
 			#print $ssh->error;
 		}
 	} else {
@@ -132,7 +135,7 @@ sub new {
 	}
 
 	### IF we dont have credentials and are sshing to a remote host, get credentials
-	if ( defined $ssh && $self->get_credpath eq "" &&  $creds == 1) {
+	if ( defined $ssh && $self->get_credpath eq "" && $creds == 1 ) {
 		my $admin_credpath = $self->get_cred( "eucalyptus", "admin" );
 		if ( $admin_credpath !~ /eucarc/ ) {
 			$self->fail("Failed to download credentials");
@@ -155,15 +158,15 @@ sub fail {
 	push( @running_log, "^^^^^^[TEST_REPORT] FAILED $message^^^^^^\n" );
 	print("^^^^^^[TEST_REPORT] FAILED $message^^^^^^\n");
 	$self->{FAIL_COUNT}++;
-	push(@failure_log, $message . "\n");
-	if( 0 ){
+	push( @failure_log, $message . "\n" );
+	if (0) {
 		sleep 2;
-		print $self->sys("tail -100 " . $self->get_eucadir() . "/var/log/eucalyptus/cloud-output.log");
+		print $self->sys( "tail -100 " . $self->get_eucadir() . "/var/log/eucalyptus/cloud-output.log" );
 	}
-	
-	if($self->{EXITONFAIL}){
+
+	if ( $self->{EXITONFAIL} ) {
 		exit(1);
-	}else{
+	} else {
 		return 0;
 	}
 }
@@ -203,23 +206,23 @@ sub tee {
 	return 0;
 }
 
-sub get_execution_time{
-	my $self= shift;
-	$self->test_name("This test took " . (time() - $self->{STARTTIME}) . "s to execute");
+sub get_execution_time {
+	my $self = shift;
+	$self->test_name( "This test took " . ( time() - $self->{STARTTIME} ) . "s to execute" );
 	return 0;
 }
 
-sub do_exit{
-	my $self =shift;
+sub do_exit {
+	my $self       = shift;
 	my $fail_count = $self->get_fail_count();
 	$self->get_execution_time();
-	$self->test_name("Test ended with " . $fail_count . " failures.");
+	$self->test_name( "Test ended with " . $fail_count . " failures." );
 	print "@failure_log";
 	$self->cleanup();
-	if ($fail_count > 0){
-		
+	if ( $fail_count > 0 ) {
+
 		exit(1);
-	}else{
+	} else {
 		exit(0);
 	}
 }
@@ -235,18 +238,18 @@ sub generate_random_string {
 	return $string;
 }
 
-sub generate_random_file{
+sub generate_random_file {
 	my $self = shift;
 	my $name = shift;
 	my $size = shift;
-	if( !defined $name){
+	if ( !defined $name ) {
 		$name = "test_file";
 	}
-	if( !defined $size){
+	if ( !defined $size ) {
 		$size = 1;
 	}
 	my @output = $self->sys("dd if=/dev/urandom of=$name bs=1048576 count=$size");
-	
+
 	return $name;
 }
 
@@ -476,7 +479,10 @@ sub update_testlink {
 	open FILE, ">", "$run_file" or die $!;
 	print FILE"@running_log";
 	close FILE;
-	my @scp_result = `scp $run_file root\@192.168.51.187:artifacts/$run_file`;
+	my $previous_timeout = $self->get_timeout();
+	$self->set_timeout(60);
+	my @scp_result = $self->sys("scp $run_file root\@192.168.51.187:artifacts/$run_file");
+	
 
 	#print "@scp_result";
 
@@ -538,6 +544,7 @@ sub update_testlink {
 	##UPLOADING THE TC RESULT WILL RETURN ME THE EXEC ID
 
 	$self->sys("rm $run_file");
+	$self->set_timeout($previous_timeout);
 	print "Updated Testcase: $tc_id in Testplan $tplan_id with result $status on build $build_id which is revno $build and exec_id \n";
 	return $exec_resp[0];
 }
@@ -551,13 +558,14 @@ sub attach_artifacts {
 	}
 	chomp $exec_id;
 	## SEND THE ARTIFACTS TO THE REMOTE MACHINE
+	my $previous_timeout = $self->get_timeout();
+	$self->set_timeout(60);
 	my @mkdir_artifacts_response = $self->sys("ssh root\@192.168.51.187 -o StrictHostKeyChecking=no \'mkdir artifacts\'");
 	my @mkdir_execid_response    = $self->sys("ssh root\@192.168.51.187 -o StrictHostKeyChecking=no \'mkdir artifacts/$exec_id\'");
-	my @scp_artifacts_result     = `scp ../artifacts/*.out root\@192.168.51.187:artifacts/$exec_id`;
-
+	my @scp_artifacts_result     = $self->sys("scp ../artifacts/*.out root\@192.168.51.187:artifacts/$exec_id");
 	## LOOK FOR ALL THE REMOTE ARTIFACTS UPLOADED
 	my @remote_artifacts = $self->sys("ssh root\@192.168.51.187 -o StrictHostKeyChecking=no \'ls artifacts/$exec_id\'");
-
+    
 	foreach my $artifact (@remote_artifacts) {
 		chomp $artifact;
 		### SKIP IF ITS NOT A RUN SCRIPT
@@ -568,6 +576,7 @@ sub attach_artifacts {
 
 	##DELETE ARTICACTS AFTER UPLOAD
 	my @remove_artifacts = $self->sys("ssh root\@192.168.51.187 -o StrictHostKeyChecking=no \'rm -rf artifacts/$exec_id\'");
+	$self->set_timeout($previous_timeout);
 	return 0;
 }
 
@@ -804,35 +813,35 @@ sub send_cred {
 	return $self->{CREDPATH};
 }
 
-sub get_access_key{
-	my $self = shift;
+sub get_access_key {
+	my $self      = shift;
 	my $cred_path = shift;
-	if( !defined $cred_path){
+	if ( !defined $cred_path ) {
 		$cred_path = $self->get_credpath();
 	}
-	
+
 	my @access_key = $self->sys("cat $cred_path/eucarc | grep export | grep ACCESS | awk \'BEGIN { FS = \"=\" } ; { print \$2 }\' ");
 	$access_key[0] =~ s/'//g;
-	chomp($access_key[0]);
+	chomp( $access_key[0] );
 	return $access_key[0];
 }
 
-sub get_secret_key{
-	my $self = shift;
+sub get_secret_key {
+	my $self      = shift;
 	my $cred_path = shift;
-	if( !defined $cred_path){
+	if ( !defined $cred_path ) {
 		$cred_path = $self->get_credpath();
 	}
-	
+
 	my @secret_key = $self->sys("cat $cred_path/eucarc | grep export | grep SECRET | awk \'BEGIN { FS = \"=\" } ; { print \$2 }\' ");
 	$secret_key[0] =~ s/'//g;
-	chomp($secret_key[0]);
+	chomp( $secret_key[0] );
 	return $secret_key[0];
 }
 
-sub setup_s3cfg{
-	my $self = shift;
-	my $credpath = shift;
+sub setup_s3cfg {
+	my $self         = shift;
+	my $credpath     = shift;
 	my $cfg_template = <<CFG;
 [default]
 access_key = ACCESSKEY
@@ -863,9 +872,9 @@ use_https = False
 verbosity = WARNING
 
 CFG
-	my @clc = $self->get_machines('clc');
+	my @clc         = $self->get_machines('clc');
 	my $frontend_ip = $clc[0]->{'ip'};
-	my $access = $self->get_access_key($credpath);
+	my $access      = $self->get_access_key($credpath);
 	chomp($access);
 	my $secret = $self->get_secret_key($credpath);
 	chomp($secret);
@@ -880,8 +889,8 @@ CFG
 
 }
 
-sub sync_keys{
-	my $self = shift;
+sub sync_keys {
+	my $self      = shift;
 	my @local_key = `cat ~/.ssh/id_rsa.pub`;
 	$self->sys("echo \'$local_key[0]\' >> ~/.ssh/authorized_keys");
 	return 0;
@@ -1681,7 +1690,7 @@ sub create_snapshot {
 					$self->fail("Did not find $snap_id in describe-snapshots");
 					return undef;
 				}
-				my @snapshot_info  = split( / /, $snapshot_poll[0] );
+				my @snapshot_info  = split( /\s+/, $snapshot_poll[0] );
 				my @new_percentage = split( /%/, $snapshot_info[5] );
 				if ( $new_percentage[0] > $old_percentage ) {
 					$self->test_name("Snapshot went from $old_percentage to $new_percentage[0]");
@@ -1765,19 +1774,19 @@ sub euare_create_user {
 	my $new_user  = shift;
 	my $account   = shift;
 	my $user_path = shift;
-	
+
 	my $delegate = " ";
 	if ( !defined $user_path ) {
 		$user_path = "/";
 	}
 	if ( !defined $account ) {
 		$account = "eucalyptus";
-	}else{
+	} else {
 		$delegate .= "--delegate $account";
 	}
 	my $cmd = "euare-usercreate -u $new_user -p $user_path" . $delegate;
 	$self->sys($cmd);
-	
+
 	if ( !$self->found( "euare-userlistbypath" . $delegate, qr/$new_user/ ) ) {
 		$self->fail("could not create new user arn:aws:iam::$account:user$user_path$new_user");
 		return undef;
@@ -2019,19 +2028,19 @@ sub get_currentaccount {
 }
 
 sub euare_create_group {
-	my $self    = shift;
-	my $group   = shift;
-	my $path    = shift;
-	my $account = shift;
+	my $self     = shift;
+	my $group    = shift;
+	my $path     = shift;
+	my $account  = shift;
 	my $delegate = " ";
-	my $cmd = "euare-groupcreate -g $group -p $path";
-	if( !defined $account){
+	my $cmd      = "euare-groupcreate -g $group -p $path";
+	if ( !defined $account ) {
 		$account = $self->get_currentaccount();
-	}else{
+	} else {
 		$delegate .= "--delegate $account";
 	}
-		
-	$self->sys($cmd . $delegate);
+
+	$self->sys( $cmd . $delegate );
 	if ( !$self->found( "euare-grouplistbypath" . $delegate, qr/arn:aws:iam::$account:group$path$group/ ) ) {
 		$self->fail("could not create new group $group");
 		return undef;
@@ -2039,151 +2048,151 @@ sub euare_create_group {
 	return $group;
 }
 
-sub euare_group_add_user{
-	my $self = shift;
-	my $group = shift;
-	my $user = shift;
-	my $account = shift;
+sub euare_group_add_user {
+	my $self     = shift;
+	my $group    = shift;
+	my $user     = shift;
+	my $account  = shift;
 	my $delegate = "";
-	my $cmd = "euare-groupadduser -g $group -u $user";
-	if( defined $account){
+	my $cmd      = "euare-groupadduser -g $group -u $user";
+	if ( defined $account ) {
 		$delegate .= " --delegate $account";
 	}
-	my @adduser_return = $self->sys($cmd . $delegate);
-	if( @adduser_return > 0){
+	my @adduser_return = $self->sys( $cmd . $delegate );
+	if ( @adduser_return > 0 ) {
 		$self->fail("Could not add user to group");
 		return undef;
-	}else{
+	} else {
 		return 0;
 	}
-	
+
 }
 
-sub euare_attach_policy_user{
-	my $self = shift;
-	my $user = shift;
-	my $name = shift;
-	my $file = shift;
-	my $account = shift;
+sub euare_attach_policy_user {
+	my $self     = shift;
+	my $user     = shift;
+	my $name     = shift;
+	my $file     = shift;
+	my $account  = shift;
 	my $delegate = " ";
-	
-	if( !defined $account){
+
+	if ( !defined $account ) {
 		$account = $self->get_currentaccount();
-	}else{
+	} else {
 		$delegate .= "--delegate $account";
 	}
 	$self->test_name("Add a user policy");
 	### IF THE INPUT CONTAINS THE POLICY KEYWORDS ASSUME ITS A FULL POLICY
-	if($file =~ /Action/ && $file =~ /Effect/ && $file =~ /Resource/){
-       $file =~ s/\n//g;
-       $self->sys("euare-useruploadpolicy -u $user -p $name -o \'$file\' " . $delegate);
-    }else{
-	   $self->sys("euare-useruploadpolicy -u $user -p $name -f $file " . $delegate);
-    }
-	$self->test_name("Check policy is active");
-	if (!$self->found("euare-userlistpolicies -u $user" . $delegate, qr/$name/)) {
-	  $self->fail("failed to upload policy to user");
-	}else{
-		$self->sys("euare-usergetpolicy -u $user -p $name" . $delegate);
+	if ( $file =~ /Action/ && $file =~ /Effect/ && $file =~ /Resource/ ) {
+		$file =~ s/\n//g;
+		$self->sys( "euare-useruploadpolicy -u $user -p $name -o \'$file\' " . $delegate );
+	} else {
+		$self->sys( "euare-useruploadpolicy -u $user -p $name -f $file " . $delegate );
 	}
-	
+	$self->test_name("Check policy is active");
+	if ( !$self->found( "euare-userlistpolicies -u $user" . $delegate, qr/$name/ ) ) {
+		$self->fail("failed to upload policy to user");
+	} else {
+		$self->sys( "euare-usergetpolicy -u $user -p $name" . $delegate );
+	}
+
 }
 
-sub euare_detach_policy_user{
-	my $self = shift;
-	my $user = shift;
-	my $name = shift;
-	my $account = shift;
+sub euare_detach_policy_user {
+	my $self     = shift;
+	my $user     = shift;
+	my $name     = shift;
+	my $account  = shift;
 	my $delegate = " ";
-	
-	if( !defined $account){
+
+	if ( !defined $account ) {
 		$account = $self->get_currentaccount();
-	}else{
+	} else {
 		$delegate .= "--delegate $account";
 	}
 	$self->test_name("Removing $name policy from $user");
-	$self->sys("euare-userdelpolicy -u $user -p $name " . $delegate);
+	$self->sys( "euare-userdelpolicy -u $user -p $name " . $delegate );
 
 	$self->test_name("Check policy isnt active");
-	if ($self->found("euare-userlistpolicies -u $user" . $delegate, qr/$name/)) {
-	  $self->fail("failed to upload policy to user");
+	if ( $self->found( "euare-userlistpolicies -u $user" . $delegate, qr/$name/ ) ) {
+		$self->fail("failed to upload policy to user");
 	}
-	
+
 }
-sub euare_detach_policy_account{
-	my $self = shift;
+
+sub euare_detach_policy_account {
+	my $self    = shift;
 	my $account = shift;
-	my $name = shift;
+	my $name    = shift;
 
 	$self->test_name("Removing $name policy from $account");
 	$self->sys("euare-accountdelpolicy -a $account -p $name ");
 
 	$self->test_name("Check policy isnt active");
-	if ($self->found("euare-accountlistpolicies -a $account", qr/$name/)) {
-	  $self->fail("failed to remove policy from account");
+	if ( $self->found( "euare-accountlistpolicies -a $account", qr/$name/ ) ) {
+		$self->fail("failed to remove policy from account");
 	}
-	
+
 }
 
-sub euare_attach_policy_group{
-	my $self = shift;
-	my $group = shift;
-	my $name = shift;
-	my $file = shift;
-	my $account = shift;
+sub euare_attach_policy_group {
+	my $self     = shift;
+	my $group    = shift;
+	my $name     = shift;
+	my $file     = shift;
+	my $account  = shift;
 	my $delegate = " ";
-	
-	if( !defined $account){
+
+	if ( !defined $account ) {
 		$account = $self->get_currentaccount();
-	}else{
+	} else {
 		$delegate .= "--delegate $account";
 	}
-	
-	
+
 	$self->test_name("Add a group policy");
 	### IF THE INPUT CONTAINS THE POLICY KEYWORDS ASSUME ITS A FULL POLICY
-	if($file =~ /Action/ && $file =~ /Effect/ && $file =~ /Resource/){
-       $file =~ s/\n//g;
-       $self->sys("euare-groupuploadpolicy -g $group -p $name -o \'$file\' " . $delegate);
-    }else{
-	   $self->sys("euare-groupuploadpolicy -g $group -p $name -f $file " . $delegate);
-    }
-	$self->test_name("Check policy is active");
-	if (!$self->found("euare-grouplistpolicies -g $group" . $delegate, qr/$name/)) {
-	  $self->fail("failed to upload policy to group");
-	}else{
-		$self->sys("euare-groupgetpolicy -g $group -p $name" . $delegate);
+	if ( $file =~ /Action/ && $file =~ /Effect/ && $file =~ /Resource/ ) {
+		$file =~ s/\n//g;
+		$self->sys( "euare-groupuploadpolicy -g $group -p $name -o \'$file\' " . $delegate );
+	} else {
+		$self->sys( "euare-groupuploadpolicy -g $group -p $name -f $file " . $delegate );
 	}
-	
+	$self->test_name("Check policy is active");
+	if ( !$self->found( "euare-grouplistpolicies -g $group" . $delegate, qr/$name/ ) ) {
+		$self->fail("failed to upload policy to group");
+	} else {
+		$self->sys( "euare-groupgetpolicy -g $group -p $name" . $delegate );
+	}
+
 }
-sub euare_attach_policy_account{
-	my $self = shift;
-	my $account = shift;
-	my $name = shift;
-	my $file = shift;
+
+sub euare_attach_policy_account {
+	my $self     = shift;
+	my $account  = shift;
+	my $name     = shift;
+	my $file     = shift;
 	my $delegate = " ";
-	
-	if( !defined $account){
+
+	if ( !defined $account ) {
 		$self->fail("No account name provided to attach_policy_account");
 	}
-	
-	
+
 	$self->test_name("Add an account policy");
 	### IF THE INPUT CONTAINS THE POLICY KEYWORDS ASSUME ITS A FULL POLICY
-	if($file =~ /Action/ && $file =~ /Effect/ && $file =~ /Resource/){
-	   $file =~ s/\n//g;
-	   $self->sys("euare-accountuploadpolicy -a $account -p $name -o \'$file\'" );
-	}else{
-		$self->sys("euare-accountuploadpolicy -a $account -p $name -f $file" );
+	if ( $file =~ /Action/ && $file =~ /Effect/ && $file =~ /Resource/ ) {
+		$file =~ s/\n//g;
+		$self->sys("euare-accountuploadpolicy -a $account -p $name -o \'$file\'");
+	} else {
+		$self->sys("euare-accountuploadpolicy -a $account -p $name -f $file");
 	}
-	
+
 	$self->test_name("Check policy is active");
-	if (!$self->found("euare-accountlistpolicies -a $account", qr/$name/)) {
-	  $self->fail("failed to upload policy to group");
-	}else{
-		$self->sys("euare-accountgetpolicy -a $account -p $name" );
+	if ( !$self->found( "euare-accountlistpolicies -a $account", qr/$name/ ) ) {
+		$self->fail("failed to upload policy to group");
+	} else {
+		$self->sys("euare-accountgetpolicy -a $account -p $name");
 	}
-	
+
 }
 
 sub euare_parse_arn {

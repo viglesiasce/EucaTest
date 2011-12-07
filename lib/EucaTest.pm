@@ -7,7 +7,7 @@ use warnings;
 use Net::OpenSSH;
 require Exporter;
 use Data::Dumper;
-
+use Term::ANSIColor;
 our @ISA = qw(Exporter);
 
 # Items to export into callers namespace by default. Note: do not export
@@ -66,6 +66,10 @@ sub new {
 	if ( !defined $exit_on_fail ) {
 		$exit_on_fail = 0;
 	}
+	my $no_fail = $opts->{'no_fail'};
+	if ( !defined $no_fail ) {
+        $no_fail = 0;
+    }
 	my $timeout = $opts->{'timeout'};
 	if ( !defined $timeout ) {
 		$timeout = 120;
@@ -100,7 +104,7 @@ sub new {
 	} else {
 		$password = ":" . $password;
 	}
-	my $self = { SSH => $ssh, CREDPATH => $credpath, TIMEOUT => $timeout, EXITONFAIL => $exit_on_fail, STARTTIME => time(), EUCADIR => $eucadir, VERIFY_LEVEL => $verify_level, TOOLKIT => $toolkit, DELAY => $delay, FAIL_COUNT => $fail_count, INPUT_FILE => $input_file, PASSWORD => $password };
+	my $self = { SSH => $ssh, CREDPATH => $credpath, TIMEOUT => $timeout, EXITONFAIL => $exit_on_fail, NOFAIL => $no_fail, STARTTIME => time(), EUCADIR => $eucadir, VERIFY_LEVEL => $verify_level, TOOLKIT => $toolkit, DELAY => $delay, FAIL_COUNT => $fail_count, INPUT_FILE => $input_file, PASSWORD => $password };
 	bless $self;
 
 	$CLC_INFO = $self->read_input_file($input_file);
@@ -154,11 +158,14 @@ sub new {
 sub fail {
 	my $self    = shift;
 	my $message = shift;
-
-	push( @running_log, "^^^^^^[TEST_REPORT] FAILED $message^^^^^^\n" );
-	print("^^^^^^[TEST_REPORT] FAILED $message^^^^^^\n");
-	$self->{FAIL_COUNT}++;
-	push( @failure_log, $message . "\n" );
+    if(!$self->{NOFAIL}){
+	   push( @running_log, "^^^^^^[TEST_REPORT] FAILED $message^^^^^^\n" );
+	   print color 'red';
+	   print("^^^^^^[TEST_REPORT] FAILED $message^^^^^^\n");
+	   print color 'reset';
+	   $self->{FAIL_COUNT}++;
+	   push( @failure_log, $message . "\n" );
+    }
 	if (0) {
 		sleep 2;
 		print $self->sys( "tail -100 " . $self->get_eucadir() . "/var/log/eucalyptus/cloud-output.log" );
@@ -1556,8 +1563,8 @@ sub reboot_instance {
 	my @output      = $self->sys("$self->{TOOLKIT}reboot-instances $instance_id");
 	sleep 80;
 	my @uptime_new = $self->sys("ssh root\@$ip -i $keypair.priv \"cat /proc/uptime | awk \'{print \$1}\'\"");
-
-	if ( $uptime_old[0] > $uptime_new[0] ) {
+    
+	if ( int($uptime_old[0]) > int($uptime_new[0]) ) {
 		$self->pass("Instance rebooted. Old uptime: $uptime_old[0]  New uptime:  $uptime_new[0]");
 		return $instance_id;
 	} else {
@@ -1671,7 +1678,7 @@ sub create_snapshot {
 	my $self          = shift;
 	my $volume        = shift;
 	my @create_output = $self->sys("euca-create-snapshot $volume");
-	my $poll_interval = 20;
+	my $poll_interval = 30;
 	my $poll_count    = 15;
 	### Check that there was output from the create command
 	if ( @create_output < 1 ) {
