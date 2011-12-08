@@ -1361,21 +1361,11 @@ sub delete_bundle {
 
 sub run_instance {
 	my $self      = shift;
-	my $keypair   = shift;
-	my $group     = shift;
-	my $OPTS      = shift;
 	my $time      = time();
+	my $keypair   = shift || $self->add_keypair( "keypair-" . $time ); 
+	my $group     = shift || $self->add_group("group-" . $time);
+	my $emi		  = shift || $self->get_emi();
 	my $inst_hash = {};
-	if ( !defined $keypair ) {
-		$keypair = $self->add_keypair( "keypair-" . $time );
-	}
-	if ( !defined $group ) {
-		$group = "group-" . $time;
-		$self->add_group($group);
-
-	}
-
-	my $emi = $self->get_emi();
 
 	$self->test_name("Sending run instance command");
 	my $base_command = "$self->{TOOLKIT}run-instances -g $group -k $keypair  $emi";
