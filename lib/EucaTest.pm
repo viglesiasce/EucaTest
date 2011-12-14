@@ -600,9 +600,11 @@ sub sys {
 	my $timeout      = shift;
 	my $verbose      = shift;
 	my $original_cmd = $cmd;
+	my $error = -69;
 	if ( $self->{CREDPATH} ne "" ) {
 		$cmd = ". " . $self->{CREDPATH} . "/eucarc && " . $cmd;
 	}
+
 
 	sleep( $self->{DELAY} );
 	my $systimeout;
@@ -614,6 +616,7 @@ sub sys {
     if ( ! defined $verbose ) {
         $verbose = 1;
     }
+    print "Running $cmd with a timeout of:$systimeout\n";
 	my @output;
 
 	# Return and print failure
@@ -630,7 +633,7 @@ sub sys {
 			     $self->tee("[$rem_user\@$rem_host - $timestamp] $original_cmd\n");
 			}
 			@output = $self->{SSH}->capture($cmd);
-
+			$error = $self->{SSH}->error; 
 			#$self->{SSH}->error and $self->fail( "SSH ERROR: " . $self->{SSH}->error);
 
 		} else {
@@ -646,15 +649,18 @@ sub sys {
 	if ($@) {
 		die unless $@ eq "alarm\n";    # propagate unexpected errors
 		                               # timed out
-		$self->tee("@output\n");
+		$self->tee("@output\nReturned:$error");
 		if( $verbose ){
 		  $self->fail("Timeout occured after $systimeout seconds\n");
 		}
+		#push 408 as err code?
+		push (@output, 408);
 		return @output;
 	} else {                           # didn't
 	   if( $verbose ){
-		  $self->tee("@output\n");
+		  $self->tee("@output\nReturned:$error\n");
 	   }
+	   	push (@output,$error);
 		return @output;
 
 	}
@@ -2445,10 +2451,10 @@ sub get_master_clc {
 	my $self = shift;
 	my $access_key = shift || $self->get_access_key();
 	my $secret_key = shift || $self->get_secret_key();
-	my $ec2_url = shift || $self->get_ec2_url();
-	my $password = shift || $self->{'PASSWORD'}; 
+	my $timeout = shift || 5; 
 	my $master = undef;
 	my $output = "";
+	my $error = 0; 
 	my @clcs = ();  
 	my @complist = ();  
 	my $host = "";
@@ -2468,19 +2474,19 @@ sub get_master_clc {
 		return $clcs[0];
 	}
 	
-	my $servicescmd = "euca-describe-services -S $secret_key -I $access_key -U $ec2_url ";
-	$servicescmd = "$servicescmd | grep -i eucalyptus | grep -i enabled | awk '{print \$7}'";
-	
 	#go through our list of CLCs and see if they agree who the master is
 	for (@clcs){
 		$clcip = $_;
-		$host = "root" . $password . "\@" . $clcip;
-		my $clc = Net::OpenSSH->new( $host, master_opts => [ -o => "StrictHostKeyChecking=no", -o => "UserKnownHostsFile=/dev/null" ] );
-		#describe services to get the current master
-		print "Issuing cmd:$servicescmd\n"; 
-		my $output = ($clc->capture("$servicescmd"))[0];	
+		#form our cmd
+		my $ec2_url = "http://$clcip:8773/services/Eucalyptus";
+		my $servicescmd = "euca-describe-services -S $secret_key -I $access_key -U $ec2_url ";
+		$servicescmd = "$servicescmd | grep -i eucalyptus | grep -i enabled | awk '{print \$7}'";
 
-		if (! $clc->error){
+		#describe services to get the current master		
+		my @out = $self->sys($servicescmd,$timeout);
+		$output = $out[0];
+		$error = $out[@out-1]; 
+		if ($error eq "0"){
 			#see if our list of component ips is found in our ssh cmd output instead of checking for error strings
 			for (@clcs){
 				if ($output =~ /$_:/){
@@ -2499,6 +2505,9 @@ sub get_master_clc {
 					}	
 				}
 			}
+		}else {
+			#this may be expected depending on the state of the system
+			print "Command:$servicescmd\nReturned Error:$error\n"; 
 		}
 	}
 	if (! defined $master){
@@ -2518,7 +2527,9 @@ sub get_master_component {
 	my $clcip = shift; #to avoid looking up the master or forcing a current CC lookup, pass this
 	my $access_key = shift || $self->get_access_key();
 	my $secret_key = shift || $self->get_secret_key();
-	my $ec2_url = shift || $self->get_ec2_url();
+	my $timeout = shift || 5; 
+	my $ec2_url = shift;
+	my $error = 0; 
 	my $password = shift || $self->{'PASSWORD'};
 	my @complist = ();
 	my $master = undef; 
@@ -2538,7 +2549,7 @@ sub get_master_component {
 		return $complist[0]; 
 	}
 	if ( ! defined $clcip){
-		$clcip = $self->get_master_clc($access_key, $secret_key,  $ec2_url, $password);
+		$clcip = $self->get_master_clc($access_key, $secret_key,  $ec2_url, $timeout);
 		if (! defined $clcip){
 			$self->fail('get_master_component failed to retrieve master clc for component:$component');
 			return undef;
@@ -2561,23 +2572,27 @@ sub get_master_component {
 		$self->fail("unknown component\"$component\" in get_master_component()");
 		return undef;
 	}
-	
+	if (! defined $ec2_url){
+		$ec2_url = "http://$clcip:8773/services/Eucalyptus";
+	}
 	my $servicescmd = "euca-describe-services -S $secret_key -I $access_key -U $ec2_url ";
 	$servicescmd = "$servicescmd | grep -i $component | grep -i enabled | awk '{print \$7}'";
 	
 	#go through our list of CLCs and see if they agree who the master is
-	$host = "root" . $password . "\@" . $clcip;
-	my $clc = Net::OpenSSH->new( $host, master_opts => [ -o => "StrictHostKeyChecking=no", -o => "UserKnownHostsFile=/dev/null" ] );
 	#describe services to get the current master
-	print "Issuing cmd: $servicescmd \n";
-	$master = ($clc->capture("$servicescmd"))[0];	
-	if (! $clc->error){
+	my @out = $self->sys($servicescmd, $timeout);
+	$error = $out[@out-1]; 
+	$master = $out[0];
+	if ($error eq "0"){
 		for (@complist){
 			if ( $master =~ /$_:/){
 				print "component:$component master:$_\n"; 
 				return $_; 
 			}
 		}
+	} else {
+		$self->fail("Could not get master component:$component\nCmd:$servicescmd Error:$error");
+		return undef;
 	}
 	return undef;
 }#get_master_component
