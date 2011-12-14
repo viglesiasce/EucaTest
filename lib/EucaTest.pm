@@ -616,7 +616,7 @@ sub sys {
     if ( ! defined $verbose ) {
         $verbose = 1;
     }
-    print "Running $cmd with a timeout of:$systimeout\n";
+   
 	my @output;
 
 	# Return and print failure
