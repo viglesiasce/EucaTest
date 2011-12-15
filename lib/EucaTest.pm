@@ -597,27 +597,18 @@ sub timestamp {
 sub sys {
 	my $self         = shift;
 	my $cmd          = shift;
-	my $timeout      = shift;
-	my $verbose      = shift;
+	my $systimeout      = shift || $self->{TIMEOUT};
+	my $verbose      = shift || 1;
+	my $return_errcode	 = shift || 0; 
 	my $original_cmd = $cmd;
-	my $error = -69;
+	my $error = -408; #negative version of timeout to differentiate between local timeout and actual return code
+	my @output;
+
 	if ( $self->{CREDPATH} ne "" ) {
 		$cmd = ". " . $self->{CREDPATH} . "/eucarc && " . $cmd;
 	}
-
-
-	sleep( $self->{DELAY} );
-	my $systimeout;
-	if ( defined $timeout ) {
-		$systimeout = $timeout;
-	} else {
-		$systimeout = $self->{TIMEOUT};
-	}
-    if ( ! defined $verbose ) {
-        $verbose = 1;
-    }
-   
-	my @output;
+	sleep( $self->{DELAY} );   
+	
 
 	# Return and print failure
 	$SIG{ALRM} = sub { die "alarm\n"; };
@@ -654,13 +645,18 @@ sub sys {
 		  $self->fail("Timeout occured after $systimeout seconds\n");
 		}
 		#push 408 as err code?
-		push (@output, 408);
+		if ($return_errcode != 0 ){
+	   		push (@output,$error);
+	   	}
 		return @output;
 	} else {                           # didn't
 	   if( $verbose ){
 		  $self->tee("@output\nReturned:$error\n");
 	   }
-	   	push (@output,$error);
+	   	#some scripts depend on this being 0 for error
+	   	if ($return_errcode != 0 ){
+	   		push (@output,$error);
+	   	}
 		return @output;
 
 	}
@@ -2483,7 +2479,7 @@ sub get_master_clc {
 		$servicescmd = "$servicescmd | grep -i eucalyptus | grep -i enabled | awk '{print \$7}'";
 
 		#describe services to get the current master		
-		my @out = $self->sys($servicescmd,$timeout);
+		my @out = $self->sys($servicescmd,$timeout, undef, 1);
 		$output = $out[0];
 		$error = $out[@out-1]; 
 		if ($error eq "0"){
@@ -2580,7 +2576,7 @@ sub get_master_component {
 	
 	#go through our list of CLCs and see if they agree who the master is
 	#describe services to get the current master
-	my @out = $self->sys($servicescmd, $timeout);
+	my @out = $self->sys($servicescmd, $timeout, undef, 1);
 	$error = $out[@out-1]; 
 	$master = $out[0];
 	if ($error eq "0"){
