@@ -384,6 +384,7 @@ sub clear_log {
 }
 
 sub update_testlink {
+	return undef;
 	my $self     = shift;
 	my $tc_id    = shift;
 	my $tplan_id = shift;
@@ -554,6 +555,7 @@ sub update_testlink {
 }
 
 sub attach_artifacts {
+	return 0;
 	my $self    = shift;
 	my $exec_id = shift;
 	if ( !defined $exec_id || $exec_id == -1 ) {
