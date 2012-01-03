@@ -599,24 +599,18 @@ sub timestamp {
 sub sys {
 	my $self         = shift;
 	my $cmd          = shift;
-	my $timeout      = shift;
-	my $verbose      = shift;
+	my $systimeout      = shift || $self->{TIMEOUT};
+	my $verbose      = shift || 1;
+	my $return_errcode	 = shift || 0; 
 	my $original_cmd = $cmd;
+	my $error = -408; #negative version of timeout to differentiate between local timeout and actual return code
+	my @output;
+
 	if ( $self->{CREDPATH} ne "" ) {
 		$cmd = ". " . $self->{CREDPATH} . "/eucarc && " . $cmd;
 	}
-
-	sleep( $self->{DELAY} );
-	my $systimeout;
-	if ( defined $timeout ) {
-		$systimeout = $timeout;
-	} else {
-		$systimeout = $self->{TIMEOUT};
-	}
-    if ( ! defined $verbose ) {
-        $verbose = 1;
-    }
-	my @output;
+	sleep( $self->{DELAY} );   
+	
 
 	# Return and print failure
 	$SIG{ALRM} = sub { die "alarm\n"; };
@@ -632,7 +626,7 @@ sub sys {
 			     $self->tee("[$rem_user\@$rem_host - $timestamp] $original_cmd\n");
 			}
 			@output = $self->{SSH}->capture($cmd);
-
+			$error = $self->{SSH}->error; 
 			#$self->{SSH}->error and $self->fail( "SSH ERROR: " . $self->{SSH}->error);
 
 		} else {
@@ -648,15 +642,23 @@ sub sys {
 	if ($@) {
 		die unless $@ eq "alarm\n";    # propagate unexpected errors
 		                               # timed out
-		$self->tee("@output\n");
+		$self->tee("@output\nReturned:$error");
 		if( $verbose ){
 		  $self->fail("Timeout occured after $systimeout seconds\n");
 		}
+		#push 408 as err code?
+		if ($return_errcode != 0 ){
+	   		push (@output,$error);
+	   	}
 		return @output;
 	} else {                           # didn't
 	   if( $verbose ){
-		  $self->tee("@output\n");
+		  $self->tee("@output\nReturned:$error\n");
 	   }
+	   	#some scripts depend on this being 0 for error
+	   	if ($return_errcode != 0 ){
+	   		push (@output,$error);
+	   	}
 		return @output;
 
 	}
@@ -826,12 +828,19 @@ sub send_cred {
 	return $self->{CREDPATH};
 }
 
+sub get_ec2_url {
+	my $self = shift;
+	my $cred_path = shift || $self->get_credpath();
+	
+	my $ec2_url = ($self->sys("cat $cred_path/eucarc | grep export | grep EC2_URL | awk \'BEGIN { FS = \"=\" } ; { print \$2 }\' "))[0];
+	$ec2_url =~ s/'//g;
+	chomp($ec2_url);
+	return $ec2_url; 
+}
+
 sub get_access_key {
 	my $self      = shift;
-	my $cred_path = shift;
-	if ( !defined $cred_path ) {
-		$cred_path = $self->get_credpath();
-	}
+	my $cred_path = shift || $self->get_credpath();
 
 	my @access_key = $self->sys("cat $cred_path/eucarc | grep export | grep ACCESS | awk \'BEGIN { FS = \"=\" } ; { print \$2 }\' ");
 	$access_key[0] =~ s/'//g;
@@ -839,12 +848,10 @@ sub get_access_key {
 	return $access_key[0];
 }
 
+
 sub get_secret_key {
 	my $self      = shift;
-	my $cred_path = shift;
-	if ( !defined $cred_path ) {
-		$cred_path = $self->get_credpath();
-	}
+	my $cred_path = shift || $self->get_credpath();;
 
 	my @secret_key = $self->sys("cat $cred_path/eucarc | grep export | grep SECRET | awk \'BEGIN { FS = \"=\" } ; { print \$2 }\' ");
 	$secret_key[0] =~ s/'//g;
@@ -1139,7 +1146,7 @@ sub get_machines {
 			$current_machine->{'arch'}       = $4;
 			$current_machine->{'source'}     = $5;
 			$current_machine->{'role'}       = $6;
-
+			
 			#my @roles = split(/\s+/, $qa_role);
 			#= @roles;
 			if ( !defined $role || $current_machine->{'role'} =~ /$role/i ) {
@@ -1149,8 +1156,21 @@ sub get_machines {
 	}
 
 	close(INPUT);
-
 	return @machines;
+}
+
+sub print_machine(){
+	my $self = shift;
+	my $current_machine = shift || print "No machine";
+	print "Print Machine:\n";
+	print "
+	ip:$current_machine->{'ip'}
+	distro:$current_machine->{'distro'}     
+	ver:$current_machine->{'distro_ver'} 
+	arch:$current_machine->{'arch'}      
+	source:$current_machine->{'source'}    
+	role:$current_machine->{'role'}      
+	" 
 }
 
 ### returns an ARRAY [indexed by cluster] of HASHES {keyed on component abbrv} of  ARRAYS [indexed on component number] of MACHINES
@@ -1180,6 +1200,7 @@ sub get_clusters {
 	}
 	return @clusters;
 }
+
 
 sub discover_emis {
 	my $self = shift;
@@ -1363,21 +1384,11 @@ sub delete_bundle {
 
 sub run_instance {
 	my $self      = shift;
-	my $keypair   = shift;
-	my $group     = shift;
-	my $OPTS      = shift;
 	my $time      = time();
+	my $keypair   = shift || $self->add_keypair( "keypair-" . $time ); 
+	my $group     = shift || $self->add_group("group-" . $time);
+	my $emi		  = shift || $self->get_emi();
 	my $inst_hash = {};
-	if ( !defined $keypair ) {
-		$keypair = $self->add_keypair( "keypair-" . $time );
-	}
-	if ( !defined $group ) {
-		$group = "group-" . $time;
-		$self->add_group($group);
-
-	}
-
-	my $emi = $self->get_emi();
 
 	$self->test_name("Sending run instance command");
 	my $base_command = "$self->{TOOLKIT}run-instances -g $group -k $keypair  $emi";
@@ -2279,6 +2290,315 @@ sub euare_modattr {
 		$self->fail("failed to change group path");
 	}
 }
+
+# mount volume and return mountpoint string ie: '/mnt/vol_sdf'
+# return value is the mountpoint for success or undef for failure
+sub mount_dev {
+	my $self = shift;
+	my $devpath = shift || $self->fail("Required parameter devpath not provided to function mount_volume_dev()");
+	my $devname = $devpath; 
+	$devname =~ s/^\/.*\///g; 
+	my $mountpoint = shift ||  "/mnt/vol_$devname"; 
+	my $fstype = shift || "ext3";
+	
+	if (! $devpath =~ /dev/ ){
+		$devpath = "/dev/$devname";
+	}
+	#see if this is already mounted, if not mount it...
+	if ( $self->found("df -k $mountpoint", "No such file or directory")) {
+		#make our mount point 
+		$self->sys("mkdir $mountpoint");
+		$self->sys("mkfs.$fstype -F $devpath");
+		if( $self->found("mount $devpath $mountpoint", qr/does not exist/)){
+        	$self->fail("Could not mount device");
+        	return undef; 
+    	} elsif ( ! $self->found("df $mountpoint", qr/^$devpath/)){
+			$self->fail("Device not mounted properly");
+			return undef; 
+		}
+	}
+	#we're mounted return the mountpoint
+	return $mountpoint; 
+}
+
+
+# Get a value out of df, ie: Used, Available, Capacity,  Mounted on, etc...
+# Example: get_disk_info('/dev/disk1, available)
+# Return value will be the value found at the row=dev,col=colname in the table, or -1 to indicate err
+sub get_disk_info {
+	my $self = shift; 
+	my $dev = shift || $self->fail("Required parameter mountpoint not provided to function get_volume_avail_size()");
+	my $colname = shift || "AVAILABLE"; #string used to identify column of value
+	my $retval = -1; #used to store return value 
+	my $colnumber = -1; #column holding available bytes, default to 3. 
+	my @cmdout = $self->sys('df -k');
+	my $line = "";
+	my @spline = (); 
+	my $words = 0; 
+	
+	$colname = uc($colname);
+	$dev = uc($dev);
+	print "looking for:'$colname' dev:'$dev'\n";
+	for (@cmdout){
+		$line = chomp $_; 
+		$line = uc($_)." "; #upper case it
+		print "our line:'$line'\n";
+        #get the column containing available bytes first, may vary per version/system?
+        if ($line =~ /$colname/ ){
+        		#print "Got a line with $colname in it\n";
+                my @spline = split(' ',$line);
+                $colnumber = 0;
+                $words = @spline;
+                while( $colnumber <= $words){
+                        if ($spline[$colnumber] =~ /$colname/){
+                        		print "got $colname at $colnumber\n";
+                                last;
+                        }else{
+                                $colnumber++;
+                        }
+                }
+        } elsif ($line =~ /$dev(\s|$)/ ){ 
+        		@spline = ();
+                @spline = split (' ', $line);
+                $retval = $spline[$colnumber];
+                print "$dev:$colname = $retval\n";
+                return $retval;
+        }
+	}
+	return $retval;
+}#end get_volume_size_info()
+
+
+#fill a file on a volume with random data. The file size is specified in a percentage of the available bytes on the partition. 
+#Return value will be the md5sum of the file, and the new file's name (md5,filename), or 0,0 to indicate a full disk, undef to indicate failure 
+sub fill_volume {
+	my $self = shift;
+	my $mountpoint = shift || $self->fail("Required parameter mountpoint not provided to function fill_volume()");
+	my $percentage = shift || 100;  #ie 100=100%, 75 = 75% of full, etc..
+	my $testfile = shift || "$mountpoint".'/'."fill_volume_testfile";
+	my @output = (); 
+	my $line = "";
+	my $blocks = 0;
+	my $blocksize = 1024; #for use with -k option output will be in 1k blocks 
+	my $available = 0;
+	my $currentper = 0; 
+	my $md5 = 0; 
+	my $cmd = "";
+	
+	if ( ! $testfile =~ /$mountpoint/){
+		$testfile = "$mountpoint".'/'."$testfile";
+	}
+	
+	if ($percentage > 100){
+		$self->fail("Percentage is greater than 1 (100%) in fill_volume()");
+	}
+	
+	if ($self->found("touch $testfile","cannot") ){
+		$self->fail("Could not create file on mountpoint:$testfile");
+		return undef;
+	}
+	if ( $percentage != 100 ){
+		$currentper = $self->get_disk_info($mountpoint,'use%');
+		$currentper =~ s/\%//g; 
+		if ($currentper >= $percentage){
+			print "Mount point is already at:$currentper %, requested:$percentage %\n";
+			return (0,0); 
+		}
+		#fill the file to a percentage, so calc the percentage first...
+		$available = $self->get_disk_info($mountpoint,'available');
+		if ($available == -1 ){
+			$self->fail("Could not get available space from:$mountpoint");
+			return undef;
+		}
+		if ($available == 0){
+			#volume is already full
+			return (0,0);
+		}
+		#this will determine how many blocks we attempt to write to the file
+		$blocks = ($available * $percentage); 
+		$blocks  =~ s/\..*$//g; #round down by removing chars beyond decimal 
+		#fill the temp file with bits from /dev/zero, cuz /dev/random is too slow
+		$cmd = "dd if=/dev/zero of=$testfile bs=$blocksize count=$blocks"; 
+	}else{
+		#fill it to 100% capacity...
+		$cmd = "dd if=/dev/zero of=$testfile";
+		
+	}
+	$self->sys($cmd);
+	$self->sys('sync');
+	$md5 = ($self->sys("md5sum $testfile | awk '{print ".'$1'."}'"))[0];
+	print "fill_volume testfile md5: $md5\n";
+	return ($md5,$testfile);
+	
+}#end fill_volume()
+
+
+
+
+#return md5 checksum string for a given file path
+sub md5_file {
+	my $self = shift;
+	my $filepath = shift || $self->fail("Required parameter filepath not provided to function md5_file()");
+	my $md5 = ($self->sys("md5sum $filepath | awk '{print ".'$1'."}'"))[0];
+	return $md5;
+}#end md5_file
+
+#get the master clc
+#returns the ip string of the master's ip or name (whatever is registered in the conf file) or undef for error
+sub get_master_clc {
+	my $self = shift;
+	my $access_key = shift || $self->get_access_key();
+	my $secret_key = shift || $self->get_secret_key();
+	my $timeout = shift || 5; 
+	my $master = undef;
+	my $output = "";
+	my $error = 0; 
+	my @clcs = ();  
+	my @complist = ();  
+	my $host = "";
+	my $clcip = "";
+	my $master_session= undef; 
+	
+	#Fill the CLC list with IPs
+	for ($self->get_machines('clc')){
+		push (@clcs, $_->{'ip'});
+	}
+	if ( @clcs < 1 ){
+		$self->fail("No CLCs in ip list for function get_master_clc()");
+		return undef;
+	} 
+	if (@clcs == 1 ){
+		print "only 1 clc found ($clcs[0])\n";
+		return $clcs[0];
+	}
+	
+	#go through our list of CLCs and see if they agree who the master is
+	for (@clcs){
+		$clcip = $_;
+		#form our cmd
+		my $ec2_url = "http://$clcip:8773/services/Eucalyptus";
+		my $servicescmd = "euca-describe-services -S $secret_key -I $access_key -U $ec2_url ";
+		$servicescmd = "$servicescmd | grep -i eucalyptus | grep -i enabled | awk '{print \$7}'";
+
+		#describe services to get the current master		
+		my @out = $self->sys($servicescmd,$timeout, undef, 1);
+		$output = $out[0];
+		$error = $out[@out-1]; 
+		if ($error eq "0"){
+			#see if our list of component ips is found in our ssh cmd output instead of checking for error strings
+			for (@clcs){
+				if ($output =~ /$_:/){
+					#if master is undefined then assign this ip to the master
+					if (! defined $master){
+						$master = $_; 
+					}else{
+						#if master is previously defined but not equal to our current finding we have a sync issue
+						if ($master ne $_){
+							$self->fail("Master's differ $master vs CLC($clcip):$_");
+							return undef;
+						}else{
+							print "No conflict, returning master CLC: $master\n";
+							return $master;
+						}
+					}	
+				}
+			}
+		}else {
+			#this may be expected depending on the state of the system
+			print "Command:$servicescmd\nReturned Error:$error\n"; 
+		}
+	}
+	if (! defined $master){
+		print "Master undefined at end of get_master_clc, likely both clcs are down?"
+	}
+	return $master
+}#end get_master_clc
+
+
+
+#Retrieves the current master component from the list of machines registered in the conf file
+#If found the string registered in the conf file will be returned (should like be an IP)
+#If an enabled machine is not found on the master, undef will be returned to signal error
+sub get_master_component {
+	my $self = shift;
+	my $component = shift || $self->fail("get_master_component was not provided\n");
+	my $clcip = shift; #to avoid looking up the master or forcing a current CC lookup, pass this
+	my $access_key = shift || $self->get_access_key();
+	my $secret_key = shift || $self->get_secret_key();
+	my $timeout = shift || 5; 
+	my $ec2_url = shift;
+	my $error = 0; 
+	my $password = shift || $self->{'PASSWORD'};
+	my @complist = ();
+	my $master = undef; 
+	my $host = ""; 
+	
+	#fill the component list with IPs
+	for ($self->get_machines($component)){
+		push(@complist, $_->{'ip'});
+	}
+	
+	if (@complist < 1){
+		$self->fail("get_master could not get list of machines for component: $component");
+		return undef;
+	}
+	if (@complist == 1){
+		print "only 1 component found for component:$component master:$complist[0] \n";
+		return $complist[0]; 
+	}
+	if ( ! defined $clcip){
+		$clcip = $self->get_master_clc($access_key, $secret_key,  $ec2_url, $timeout);
+		if (! defined $clcip){
+			$self->fail('get_master_component failed to retrieve master clc for component:$component');
+			return undef;
+		}
+	}	
+	#translate the component into something searchable in describe services
+	$component = uc($component);
+	if ($component eq 'CLC'){
+		#$component = 'eucalyptus';
+		return $clcip; 
+	}elsif ($component eq 'WALRUS'){
+		$component = 'walrus';
+	}elsif ($component eq 'SC'){
+		$component = 'storage';
+	}elsif ($component eq 'CC'){
+		$component ='cluster';
+	}elsif ($component eq 'DNS'){
+		$component = 'dns';
+	}else{
+		$self->fail("unknown component\"$component\" in get_master_component()");
+		return undef;
+	}
+	if (! defined $ec2_url){
+		$ec2_url = "http://$clcip:8773/services/Eucalyptus";
+	}
+	my $servicescmd = "euca-describe-services -S $secret_key -I $access_key -U $ec2_url ";
+	$servicescmd = "$servicescmd | grep -i $component | grep -i enabled | awk '{print \$7}'";
+	
+	#go through our list of CLCs and see if they agree who the master is
+	#describe services to get the current master
+	my @out = $self->sys($servicescmd, $timeout, undef, 1);
+	$error = $out[@out-1]; 
+	$master = $out[0];
+	if ($error eq "0"){
+		for (@complist){
+			if ( $master =~ /$_:/){
+				print "component:$component master:$_\n"; 
+				return $_; 
+			}
+		}
+	} else {
+		$self->fail("Could not get master component:$component\nCmd:$servicescmd Error:$error");
+		return undef;
+	}
+	return undef;
+}#get_master_component
+
+
+
+
+
 
 1;
 __END__
