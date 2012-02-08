@@ -1466,33 +1466,35 @@ sub run_instance {
 }
 
 sub terminate_instance {
-	my $self        = shift;
-	my $instance_id = shift;
-	my @output      = $self->sys("$self->{TOOLKIT}terminate-instances $instance_id");
-	if ( @output < 1 ) {
-		$self->fail("Terminate instance command failed");
-		return undef;
-	}
-	if ( $output[0] =~ /$instance_id/ ) {
-		sleep 40;
-		my @describe_instances = $self->sys("$self->{TOOLKIT}describe-instances | grep $instance_id");
-		if ( @describe_instances < 1 ) {
-			$self->fail("After terminating instance it is no longer found in the describe instances output");
-			return undef;
-		}
-		my @instance = split( ' ', $describe_instances[0] );
-		if ( $instance[5] =~ /terminated/ ) {
-			$self->pass("Successfully terminated instance $instance_id");
-			return $instance_id;
-		} else {
-			$self->fail("Unable to terminate $instance_id, stuck in $instance[5] state");
-			return undef;
-		}
-	} else {
-		$self->fail("Unable to terminate $instance_id");
-		return undef;
-	}
-
+    my $self        = shift;
+    my $instance_id = shift;
+    chomp($instance_id);
+    my @output      = $self->sys("$self->{TOOLKIT}terminate-instances $instance_id");
+    if ( @output < 1 ) {
+        $self->fail("Terminate instance command failed");
+        return undef;
+    }
+    sleep(10);
+    my $instance_info = $self->get_instance_info($instance_id);
+    if( !defined $instance_info->{"state"}){
+    	$self->test_name("Did not find instance after terminate sent");
+    	return;
+    }
+    ### Instance terminate passed to CLC properly
+    if ( $output[0] =~ /$instance_id/ ) {
+        my $poll_count = 20;       
+        while (($poll_count > 0) && ($instance_info->{"state"} ne "terminated")){
+            sleep 10;
+            $instance_info = $self->get_instance_info($instance_id);
+            $poll_count -= 1;
+        }
+        if($poll_count == 0){
+            $self->fail("Instance $instance_id remained in " . $instance_info->{"state"} );
+        }
+        return $instance_info;
+   }else{
+   	    $self->fail("Instance $instance_id remained in " . $instance_info->{"state"} );
+   }
 }
 
 sub get_instance_info {
@@ -1612,6 +1614,8 @@ sub create_volume {
 	my @vol_create = $self->sys($cmd);
 
 	my @vol_id = split( /\s+/, $vol_create[0] );
+	
+	print `echo $vol_id[1] >> ../etc/vols.lst`;
 
 	if ( $vol_create[0] !~ /$vol_id[1].*creating.*/ ) {
 		$self->fail("After running volume-create output does not show $vol_id[1] as creating");
@@ -1678,9 +1682,9 @@ sub detach_volume {
 		$self->fail("Detach command did not return correct status");
 		return undef;
 	}
-	sleep 5;
+	sleep 20;
 	if ( !$self->found( "$self->{TOOLKIT}describe-volumes", qr/^VOLUME\s+$volume.*available/ ) ) {
-		$self->fail("Volume still attached after 5 seconds");
+		$self->fail("Volume still attached after 20 seconds");
 		return undef;
 	}
 
@@ -1701,8 +1705,10 @@ sub create_snapshot {
 	{
 		### If there was output check that it shows the SNAPSHOT as pending and the current percentage is increasing
 		if ( $create_output[0] =~ /^SNAPSHOT.*pending/ ) {
+			sleep(180);
 			my @snapshot_info = split( /\s+/, $create_output[0] );
 			my $snap_id = $snapshot_info[1];
+			print `echo $snap_id >> ../etc/vols.lst`;
 			$self->pass("Snapshot $snap_id being created and in pending state");
 			my $old_percentage = 0;
 			my $current_state  = "pending";
