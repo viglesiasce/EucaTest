@@ -920,7 +920,7 @@ sub add_keypair {
 	my $self     = shift;
 	my $keyname  = shift;
 	my $filepath = "$keyname.priv";
-	$self->sys("$self->{TOOLKIT}add-keypair $keyname | grep -v KEYPAIR > $filepath");
+	$self->sys("$self->{TOOLKIT}create-keypair $keyname | grep -v KEYPAIR > $filepath");
 	sleep 1;
 
 	#If the private key file exists and the first line starts with BEGIN RSA PRIVATE KEY
@@ -1008,7 +1008,7 @@ sub add_group {
 
 	### IF IT DOES NOT EXIST CREATE IT
 	if ( @desc_groups < 1 ) {
-		my @add_group = $self->sys("$self->{TOOLKIT}add-group $groupname -d $groupname");
+		my @add_group = $self->sys("$self->{TOOLKIT}create-group $groupname -d $groupname");
 		if ( $add_group[0] =~ /GROUP/ ) {
 			$self->pass("Added group $groupname successfully");
 		} else {
@@ -1055,7 +1055,7 @@ sub delete_group {
 	my $groupname = shift;
 	my $ip        = shift;
 	my @add_group = $self->sys("$self->{TOOLKIT}delete-group $groupname");
-	if ( $add_group[0] =~ /GROUP/ ) {
+	if ( $add_group[0] =~ /true/ ) {
 		$self->pass("Deleted group $groupname successfully");
 		return $groupname;
 	} else {
@@ -1276,7 +1276,7 @@ sub upload_euca_image {
 	chomp(@image);
 
 	#$self->sys("mkdir bundle");
-	$self->sys("$self->{TOOLKIT}bundle-image -i $dir/$hypervisor-kernel/$kernel[0] -d bundle --kernel true");
+	$self->sys("$self->{TOOLKIT}bundle-image -i $dir/$hypervisor-kernel/$kernel[0] -d bundle --arch x86_64 --kernel true");
 	$self->sys("$self->{TOOLKIT}upload-bundle -b $prefix-kernel-bucket -m bundle/$kernel[0].manifest.xml");
 	my @eki_result = $self->sys("$self->{TOOLKIT}register $prefix-kernel-bucket/$kernel[0].manifest.xml");
 	if ( $eki_result[0] !~ /eki/ ) {
@@ -1284,7 +1284,7 @@ sub upload_euca_image {
 		return undef;
 	}
 
-	$self->sys("$self->{TOOLKIT}bundle-image -i $dir/$hypervisor-kernel/$ramdisk[0] -d bundle --ramdisk true");
+	$self->sys("$self->{TOOLKIT}bundle-image -i $dir/$hypervisor-kernel/$ramdisk[0] -d bundle --arch x86_64 --ramdisk true");
 	$self->sys("$self->{TOOLKIT}upload-bundle -b $prefix-ramdisk-bucket -m bundle/$ramdisk[0].manifest.xml");
 	my @eri_result = $self->sys("$self->{TOOLKIT}register $prefix-ramdisk-bucket/$ramdisk[0].manifest.xml");
 	if ( $eri_result[0] !~ /eri/ ) {
@@ -1297,7 +1297,7 @@ sub upload_euca_image {
 	my @img = split( /\//, $dir );
 	my $dircount  = @img - 1;
 	my $imagename = $img[$dircount];
-	$self->sys("$self->{TOOLKIT}bundle-image -i $dir/$imagename.img --ramdisk $eri[1] -d bundle --kernel $eki[1]");
+	$self->sys("$self->{TOOLKIT}bundle-image -i $dir/$imagename.img --ramdisk $eri[1] -d bundle --arch x86_64 --kernel $eki[1]");
 	$self->sys("$self->{TOOLKIT}upload-bundle -b $prefix-image-bucket -m bundle/$imagename.img.manifest.xml");
 	my @emi_result = $self->sys("$self->{TOOLKIT}register $prefix-image-bucket/$imagename.img.manifest.xml");
 	my @emi = split( /\s/, $emi_result[0] );
@@ -2071,7 +2071,7 @@ sub euare_create_group {
 	}
 
 	$self->sys( $cmd . $delegate );
-	if ( !$self->found( "euare-grouplistbypath" . $delegate, qr/arn:aws:iam::$account:group$path$group/ ) ) {
+	if ( !$self->found( "euare-grouplistbypath" . $delegate, qr/arn:aws:iam::[a-z0-9]{1,128}:group$path$group/ ) ) {
 		$self->fail("could not create new group $group");
 		return undef;
 	}
@@ -2700,3 +2700,4 @@ at your option, any later version of Perl 5 you may have available.
 
 
 =cut
+
