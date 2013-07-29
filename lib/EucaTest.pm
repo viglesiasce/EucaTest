@@ -1101,7 +1101,7 @@ sub release_address {
 sub get_emi {
 	my $self   = shift;
 	my $filter = shift;
-	my $cmd    = "$self->{TOOLKIT}describe-images | grep -v windows | grep available | grep emi";
+	my $cmd    = "$self->{TOOLKIT}describe-images -a | grep -v windows | grep available | grep emi";
 	if ( defined $filter ) {
 		$cmd .= " | grep $filter";
 	}
