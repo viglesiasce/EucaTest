@@ -2071,7 +2071,7 @@ sub euare_create_group {
 	}
 
 	$self->sys( $cmd . $delegate );
-	if ( !$self->found( "euare-grouplistbypath" . $delegate, qr/arn:aws:iam::$account:group$path$group/ ) ) {
+	if ( !$self->found( "euare-grouplistbypath" . $delegate, qr/arn:aws:iam::[a-z0-9]{1,128}:group$path$group/ ) ) {
 		$self->fail("could not create new group $group");
 		return undef;
 	}
@@ -2700,3 +2700,4 @@ at your option, any later version of Perl 5 you may have available.
 
 
 =cut
+
