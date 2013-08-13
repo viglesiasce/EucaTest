@@ -1593,7 +1593,7 @@ sub create_volume {
 	my $zone = shift;
 	my $opts = shift;
 
-	my $vol_timeout = 30;
+	my $vol_timeout = 60;
 
 	if ( !defined $zone ) {
 		$self->fail("Required parameter zone not provided to function create_volume");
