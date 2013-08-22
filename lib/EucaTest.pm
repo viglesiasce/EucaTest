@@ -1614,21 +1614,19 @@ sub create_volume {
 	my @vol_create = $self->sys($cmd);
 
 	my @vol_id = split( /\s+/, $vol_create[0] );
-	
-	print `echo $vol_id[1] >> ../etc/vols.lst`;
+	my $volume = $vol_id[1];	
+	print `echo $volume >> ../etc/vols.lst`;
 
-	if ( $vol_create[0] !~ /$vol_id[1].*creating.*/ ) {
-		$self->fail("After running volume-create output does not show $vol_id[1] as creating");
+	if ( $vol_create[0] !~ /$volume.*creating.*/ ) {
+		$self->fail("After running volume-create output does not show $volume as creating");
 		return undef;
 	} else {
-		sleep $vol_timeout;
-		if ( !$self->found( "$self->{TOOLKIT}describe-volumes", qr/$vol_id[1].*$zone.*available.*/ ) ) {
-			$self->fail("Unable to create volume");
-			return undef;
-		} else {
-			$self->pass("Volume $vol_id[1] created properly");
-			return $vol_id[1];
-		}
+		if( $self->retry_operation("$self->{TOOLKIT}describe-volumes", qr/^VOLUME\s+$volume.*available/, 10) ){
+                                return $volume;
+                }
+                else{
+                        return undef;
+                }
 	}
 
 }
@@ -1636,7 +1634,7 @@ sub create_volume {
 sub delete_volume {
 	my $self   = shift;
 	my $volume = shift;
-
+	my $retry_count = 5;
 	if ( !$self->found( "$self->{TOOLKIT}delete-volume $volume", qr/^VOLUME\s+$volume/ ) ) {
 		$self->fail("Failed to delete volume");
 		return undef;
@@ -1646,9 +1644,29 @@ sub delete_volume {
 		$self->fail("After delete volume still available");
 		return undef;
 	} else {
-		return $volume;
+		if( $self->retry_operation("$self->{TOOLKIT}describe-volumes", qr/^VOLUME\s+$volume.*deleted/, 10) ){
+				return $volume;
+		}
+		else{ 
+			return undef;
+		}
 	}
 
+}
+
+sub retry_operation{
+	my $self   = shift;
+        my $operation = shift;
+	my $expected_result = shift;
+        my $retry_count = shift || 6;
+        while($retry_count > 0){
+        	if( $self->found( $operation, $expected_result) ){
+                	return 1;
+                }
+                $retry_count--;
+                sleep 10;
+        }
+        return 0;
 }
 
 sub attach_volume {
