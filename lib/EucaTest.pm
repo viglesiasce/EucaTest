@@ -1635,6 +1635,12 @@ sub delete_volume {
 	my $self   = shift;
 	my $volume = shift;
 	my $retry_count = 5;
+        if( $self->found("$self->{TOOLKIT}describe-volumes", qr/^VOLUME\s+$volume.*creating/, 10) ){
+		if( $self->retry_operation("$self->{TOOLKIT}describe-volumes", qr/^VOLUME\s+$volume.*available/, 10)){
+			$self->fail("Volume stayed in creating when we were trying to delete it");
+			return undef;
+		}
+        } 
 	if ( !$self->found( "$self->{TOOLKIT}delete-volume $volume", qr/^VOLUME\s+$volume/ ) ) {
 		$self->fail("Failed to delete volume");
 		return undef;
