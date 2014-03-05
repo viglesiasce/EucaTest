@@ -1894,7 +1894,8 @@ sub euare_clean_accounts {
 			$self->sys("euare-accountdel -a $pair[0] -r");
 		}
 	}
-	@accounts = $self->sys("euare-accountlist");
+        ## Get accounts and avoid blockstorage
+	@accounts = $self->sys("euare-accountlist | grep -v blockstorage");
 
 	if ( @accounts > 1 || !( $accounts[0] =~ /^eucalyptus/ ) ) {
 		$self->fail("failed to clean up accounts");
