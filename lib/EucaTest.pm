@@ -1491,6 +1491,7 @@ sub terminate_instance {
         if($poll_count == 0){
             $self->fail("Instance $instance_id remained in " . $instance_info->{"state"} );
         }
+        sleep(5);
         return $instance_info;
    }else{
    	    $self->fail("Instance $instance_id remained in " . $instance_info->{"state"} );
@@ -1719,7 +1720,7 @@ sub create_snapshot {
 	my $self          = shift;
 	my $volume        = shift;
 	my @create_output = $self->sys("euca-create-snapshot $volume");
-	my $poll_interval = 30;
+	my $poll_interval = 60;
 	my $poll_count    = 15;
 	### Check that there was output from the create command
 	if ( @create_output < 1 ) {
