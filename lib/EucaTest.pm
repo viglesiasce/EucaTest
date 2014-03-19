@@ -1502,7 +1502,7 @@ sub get_instance_info {
 	my $self        = shift;
 	my $instance_id = shift;
 	my $inst_hash   = {};
-	my @running     = $self->sys("$self->{TOOLKIT}describe-instances $instance_id | grep INSTANCE");
+	my @running     = $self->sys("$self->{TOOLKIT}describe-instances --show-empty-fields $instance_id | grep INSTANCE");
 	if ( @running < 1 ) {
 		$self->fail("Did not find the instance in the describe instances pool");
 		return $inst_hash;
