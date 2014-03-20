@@ -1837,7 +1837,7 @@ sub euare_create_user {
 	if ( !defined $account ) {
 		$account = "eucalyptus";
 	} else {
-		$delegate .= "--delegate $account";
+		$delegate .= "--as-account $account";
 	}
 	my $cmd = "euare-usercreate -u $new_user -p $user_path" . $delegate;
 	$self->sys($cmd);
@@ -2093,7 +2093,7 @@ sub euare_create_group {
 	if ( !defined $account ) {
 		$account = $self->get_currentaccount();
 	} else {
-		$delegate .= "--delegate $account";
+		$delegate .= "--as-account $account";
 	}
 
 	$self->sys( $cmd . $delegate );
@@ -2112,7 +2112,7 @@ sub euare_group_add_user {
 	my $delegate = "";
 	my $cmd      = "euare-groupadduser -g $group -u $user";
 	if ( defined $account ) {
-		$delegate .= " --delegate $account";
+		$delegate .= " --as-account $account";
 	}
 	my @adduser_return = $self->sys( $cmd . $delegate );
 	if ( @adduser_return > 0 ) {
@@ -2135,7 +2135,7 @@ sub euare_attach_policy_user {
 	if ( !defined $account ) {
 		$account = $self->get_currentaccount();
 	} else {
-		$delegate .= "--delegate $account";
+		$delegate .= "--as-account $account";
 	}
 	$self->test_name("Add a user policy");
 	### IF THE INPUT CONTAINS THE POLICY KEYWORDS ASSUME ITS A FULL POLICY
@@ -2164,7 +2164,7 @@ sub euare_detach_policy_user {
 	if ( !defined $account ) {
 		$account = $self->get_currentaccount();
 	} else {
-		$delegate .= "--delegate $account";
+		$delegate .= "--as-account $account";
 	}
 	$self->test_name("Removing $name policy from $user");
 	$self->sys( "euare-userdelpolicy -u $user -p $name " . $delegate );
@@ -2202,7 +2202,7 @@ sub euare_attach_policy_group {
 	if ( !defined $account ) {
 		$account = $self->get_currentaccount();
 	} else {
-		$delegate .= "--delegate $account";
+		$delegate .= "--as-account $account";
 	}
 
 	$self->test_name("Add a group policy");
